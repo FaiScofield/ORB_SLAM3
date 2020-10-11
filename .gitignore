@@ -49,5 +49,6 @@ cmake-build-debug/
 *.osa
 
 bin/
+build-master/
 .vscode/
 _clang-format
