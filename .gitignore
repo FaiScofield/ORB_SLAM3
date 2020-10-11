@@ -51,3 +51,4 @@ cmake-build-debug/
 bin/
 .vscode/
 _clang-format
+build-master/

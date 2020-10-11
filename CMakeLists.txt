@@ -7,8 +7,8 @@ ENDIF()
 
 MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall   -O3")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall   -O3")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -Wno-deprecated-declarations -Wno-unused-variable")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -Wno-deprecated-declarations")
 
@@ -50,6 +50,7 @@ endif()
 
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
+find_package(Boost REQUIRED COMPONENTS filesystem)
 
 include_directories(
     ${PROJECT_SOURCE_DIR}
@@ -57,6 +58,7 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/include/CameraModels
     ${EIGEN3_INCLUDE_DIR}
     ${Pangolin_INCLUDE_DIRS}
+    ${Boost_INCLUDE_DIRS}
 )
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
@@ -181,4 +183,4 @@ target_link_libraries(stereo_inertial_tum_vi ${PROJECT_NAME})
 
 # Test
 add_executable(mono_se2 Examples/Monocular/mono_se2.cc)
-target_link_libraries(mono_se2 ${PROJECT_NAME})
+target_link_libraries(mono_se2 ${PROJECT_NAME} ${Boost_LIBRARIES})

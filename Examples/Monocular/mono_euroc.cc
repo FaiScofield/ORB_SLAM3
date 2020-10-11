@@ -33,7 +33,7 @@ void LoadImages(const string &strImagePath, const string &strPathTimes,
                 vector<string> &vstrImages, vector<double> &vTimeStamps);
 
 int main(int argc, char **argv)
-{  
+{
     if(argc < 5)
     {
         cerr << endl << "Usage: ./mono_euroc path_to_vocabulary path_to_settings path_to_sequence_folder_1 path_to_times_file_1 (path_to_image_folder_2 path_to_times_file_2 ... path_to_image_folder_N path_to_times_file_N) (trajectory_file_name)" << endl;
@@ -63,9 +63,12 @@ int main(int argc, char **argv)
     int tot_images = 0;
     for (seq = 0; seq<num_seq; seq++)
     {
-        cout << "Loading images for sequence " << seq << "...";
-        LoadImages(string(argv[(2*seq)+3]) + "/mav0/cam0/data", string(argv[(2*seq)+4]), vstrImageFilenames[seq], vTimestampsCam[seq]);
-        cout << "LOADED!" << endl;
+        cout << "Loading images for sequence " << seq << "..." << endl;
+        const string imgPath = string(argv[(2*seq)+3]) + "/mav0/cam0/data";
+        const string timePath = string(argv[(2*seq)+4]);
+        cout << "Image path: " << imgPath << ", time path: " << timePath << endl;
+        LoadImages(imgPath, timePath, vstrImageFilenames[seq], vTimestampsCam[seq]);
+        cout << "IMAGES LOADED!" << endl;
 
         nImages[seq] = vstrImageFilenames[seq].size();
         tot_images += nImages[seq];
@@ -164,7 +167,11 @@ void LoadImages(const string &strImagePath, const string &strPathTimes,
                 vector<string> &vstrImages, vector<double> &vTimeStamps)
 {
     ifstream fTimes;
-    fTimes.open(strPathTimes.c_str());
+    fTimes.open(strPathTimes.c_str(), ios_base::in);
+    if (!fTimes.is_open()) {
+        cerr << "Open file error on " << strPathTimes << endl;
+        return;
+    }
     vTimeStamps.reserve(5000);
     vstrImages.reserve(5000);
     while(!fTimes.eof())
