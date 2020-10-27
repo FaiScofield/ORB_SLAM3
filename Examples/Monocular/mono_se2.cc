@@ -31,10 +31,8 @@
 using namespace std;
 namespace bf = boost::filesystem;
 
-void LoadImages(const string& strImagePath, int imgNum, vector<string>& vstrImages,
-                vector<double>& vTimeStamps);
-void readImagesRK(const string& strImagePath, int imgNum, vector<string>& vstrImages,
-                  vector<double>& vTimeStamps);
+void LoadImages(const string& strImagePath, int imgNum, vector<string>& vstrImages, vector<double>& vTimeStamps);
+void readImagesRK(const string& strImagePath, int imgNum, vector<string>& vstrImages, vector<double>& vTimeStamps);
 
 int main(int argc, char** argv)
 {
@@ -72,9 +70,8 @@ int main(int argc, char** argv)
     int tot_images = 0;
     for (seq = 0; seq < num_seq; seq++) {
         cout << "Loading images for sequence " << seq << "...";
-        //        LoadImages(string(argv[3]) + "/image/", 3108, vstrImageFilenames[seq], vTimestampsCam[seq]);
-        readImagesRK(string(argv[3]) + "/slamimg/", 1969, vstrImageFilenames[seq],
-                     vTimestampsCam[seq]);
+        LoadImages(string(argv[3]) + "/image/", 3108, vstrImageFilenames[seq], vTimestampsCam[seq]);
+        //        readImagesRK(string(argv[3]) + "/slamimg/", 1969, vstrImageFilenames[seq], vTimestampsCam[seq]);
         cout << "LOADED!" << endl;
 
         nImages[seq] = vstrImageFilenames[seq].size();
@@ -91,21 +88,42 @@ int main(int argc, char** argv)
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM3::System SLAM(argv[1], argv[2], ORB_SLAM3::System::MONOCULAR, true);
 
+    // camera matirx for se2 dataset
+    cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(1.5, cv::Size(8, 8));
+    cv::Mat K = cv::Mat::eye(3, 3, CV_32FC1);
+    cv::Mat D = cv::Mat::zeros(4, 1, CV_32FC1);
+    K.at<float>(0, 0) = 231.976033627644090;
+    K.at<float>(1, 1) = 232.157224036901510;
+    K.at<float>(0, 2) = 326.923920970539310;
+    K.at<float>(1, 2) = 227.838488395348380;
+    D.at<float>(0, 0) = -0.207406506100898;
+    D.at<float>(1, 0) = 0.032194071349429;
+    D.at<float>(2, 0) = 0.001120166051888;
+    D.at<float>(3, 0) = 0.000859411522110;
+    cout << endl << "K = " << K << endl;
+    cout << "D = " << D << endl;
     for (seq = 0; seq < num_seq; seq++) {
 
         // Main loop
-        cv::Mat im;
+        cv::Mat im, imUn;
         int proccIm = 0;
         for (int ni = 0; ni < nImages[seq]; ni++, proccIm++) {
 
             // Read image from file
-            im = cv::imread(vstrImageFilenames[seq][ni], CV_LOAD_IMAGE_UNCHANGED);
+//            im = cv::imread(vstrImageFilenames[seq][ni], CV_LOAD_IMAGE_UNCHANGED);
+            im = cv::imread(vstrImageFilenames[seq][ni], CV_LOAD_IMAGE_GRAYSCALE);
             double tframe = vTimestampsCam[seq][ni];
 
             if (im.empty()) {
                 cerr << endl << "Failed to load image at: " << vstrImageFilenames[seq][ni] << endl;
                 return 1;
             }
+
+            // undistort image
+            cv::undistort(im, imUn, K, D);
+            clahe->apply(imUn, imUn);
+//            cv::imshow("IMAGE UNDISTORT", imUn);
+//            cv::waitKey(5);
 
 #ifdef COMPILEDWITHC11
             std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
@@ -115,7 +133,7 @@ int main(int argc, char** argv)
 
             // Pass the image to the SLAM system
             // cout << "tframe = " << tframe << endl;
-            SLAM.TrackMonocular(im, tframe);  // TODO change to monocular_inertial
+            SLAM.TrackMonocular(imUn, tframe);  // TODO change to monocular_inertial
 
 #ifdef COMPILEDWITHC11
             std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
@@ -123,8 +141,7 @@ int main(int argc, char** argv)
             std::chrono::monotonic_clock::time_point t2 = std::chrono::monotonic_clock::now();
 #endif
 
-            double ttrack =
-                std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
+            double ttrack = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
 
             vTimesTrack[ni] = ttrack;
 
@@ -162,8 +179,7 @@ int main(int argc, char** argv)
     return 0;
 }
 
-void LoadImages(const string& strImagePath, int imgNum, vector<string>& vstrImages,
-                vector<double>& vTimeStamps)
+void LoadImages(const string& strImagePath, int imgNum, vector<string>& vstrImages, vector<double>& vTimeStamps)
 {
     vTimeStamps.reserve(imgNum + 1);
     vstrImages.reserve(imgNum + 1);
@@ -181,8 +197,7 @@ static inline bool lessThen(const pair<string, long long>& lf, const pair<string
     return lf.second < rf.second;
 }
 
-void readImagesRK(const string& strImagePath, int imgNum, vector<string>& vstrImages,
-                  vector<double>& vTimeStamps)
+void readImagesRK(const string& strImagePath, int imgNum, vector<string>& vstrImages, vector<double>& vTimeStamps)
 {
     bf::path path(strImagePath);
     if (!bf::exists(path)) {

@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include <opencv2/core/core.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include <System.h>
 
@@ -29,7 +30,7 @@ int main(int argc, char** argv)
     }
 
     // const int num_seq = (argc - 3) / 2;
-	
+
     // cout << "num_seq = " << num_seq << endl;
     // bool bFileName = (((argc - 3) % 2) == 1);
     // string file_name;
@@ -72,6 +73,7 @@ int main(int argc, char** argv)
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM3::System SLAM(argv[1], argv[2], ORB_SLAM3::System::MONOCULAR, true);
+    cv::Ptr<cv::CLAHE> claher = cv::createCLAHE(2.0, cv::Size(6, 6));
 
     for (seq = 0; seq < num_seq; seq++) {
 
@@ -81,13 +83,16 @@ int main(int argc, char** argv)
         for (int ni = 0; ni < nImages[seq]; ni++, proccIm++) {
 
             // Read image from file
-            im = cv::imread(vstrImageFilenames[seq][ni], CV_LOAD_IMAGE_UNCHANGED);
+//            im = cv::imread(vstrImageFilenames[seq][ni], CV_LOAD_IMAGE_UNCHANGED);
+            im = cv::imread(vstrImageFilenames[seq][ni], CV_LOAD_IMAGE_GRAYSCALE);
             double tframe = vTimestampsCam[seq][ni];
 
             if (im.empty()) {
                 cerr << endl << "Failed to load image at: " << vstrImageFilenames[seq][ni] << endl;
                 return 1;
             }
+
+            claher->apply(im, im);
 
 #ifdef COMPILEDWITHC11
             std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
@@ -172,13 +177,6 @@ void readImagesRK(const string& strImagePath, int imgNum, vector<string>& vstrIm
         return;
     }
 
-
-    double timeStamp = 1403636579763555584 / 1e9;  // s
-    for (int k = 0; k < imgNum; ++k) {
-        timeStamp += 0.030;  // 30ms per frame
-        vTimeStamps.push_back(timeStamp);
-    }
-
     vector<pair<string, long long>> vstrImgTime;
     vstrImgTime.reserve(imgNum + 1);
 
@@ -205,7 +203,7 @@ void readImagesRK(const string& strImagePath, int imgNum, vector<string>& vstrIm
     vstrImages.resize(numImgs);
     for (size_t k = 0; k < numImgs; ++k) {
         vstrImages[k] = vstrImgTime[k].first;
-        vTimeStamps[k] = (double)vstrImgTime[k].second / 1e3;
+        vTimeStamps[k] = (double)vstrImgTime[k].second / 1e6;
     }
 
     if (vstrImages.empty()) {

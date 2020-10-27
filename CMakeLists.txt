@@ -7,8 +7,9 @@ ENDIF()
 
 MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -O3")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -Wno-deprecated-declarations -Wno-unused-variable")
+#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -O3")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -Wno-deprecated-declarations -Wno-unused-variable")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations -Wno-unused-variable")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -Wno-deprecated-declarations")
 
@@ -184,3 +185,13 @@ target_link_libraries(stereo_inertial_tum_vi ${PROJECT_NAME})
 # Test
 add_executable(mono_se2 Examples/Monocular/mono_se2.cc)
 target_link_libraries(mono_se2 ${PROJECT_NAME} ${Boost_LIBRARIES})
+add_executable(test_mono_se2_rk_dataset test/test_mono_se2_rk_dataset.cc)
+target_link_libraries(test_mono_se2_rk_dataset ${PROJECT_NAME} ${Boost_LIBRARIES})
+add_executable(test_orbDetector test/test_orbDetector.cpp)
+target_link_libraries(test_orbDetector ${PROJECT_NAME} ${Boost_LIBRARIES})
+add_executable(test_orbMatcher test/test_orbMatcher.cpp)
+target_link_libraries(test_orbMatcher ${PROJECT_NAME} ${Boost_LIBRARIES})
+add_executable(test_featureExtract 
+	test/test_featureExtract.cpp
+	test/gms_matcher.h)
+target_link_libraries(test_featureExtract ${PROJECT_NAME})

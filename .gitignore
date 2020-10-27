@@ -52,3 +52,4 @@ bin/
 .vscode/
 _clang-format
 build-master/
+build-release/
