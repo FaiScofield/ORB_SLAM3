@@ -9,7 +9,11 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <vector>
 
+#define ENABLE_SAVE_RESULT 1
 #define DEFAULT_DATASET_FOLDER "/home/vance/dataset/se2/DatasetRoom/image/"
+#define DEFAULT_OUTPUT_FOLDER "/home/vance/output/gms/"
+#define OUTPUT_FILE_PREFIX  "no_mask_with_eq_"
+
 
 #define IMAGE_WIDTH 752
 #define IMAGE_HEIGHT 480
@@ -43,9 +47,11 @@ int main(int argc, char* argv[])
     /// parse input arguments
     CommandLineParser parser(argc, argv,
                              "{type      t|ORB|value input type: ORB, CV_ORB, CV_SURF, CV_AKAZE}"
-                             "{folder    f| |data folder}"
+                             "{inputFolder  i| |input data folder}"
+                             "{outputFolder o| |output data folder}"
                              "{undistort u|false|undistort image}"
                              "{equalize  e|false|equalize image histogram}"
+                             "{removeOE     r|true |remove features on over exposure area}"
                              "{help      h|false|show help message}");
 
     if (argc < 2 || parser.get<bool>("help")) {
@@ -53,26 +59,33 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    String strFolder = parser.get<String>("folder");
-    if (strFolder.empty())
-        strFolder = string(DEFAULT_DATASET_FOLDER);
-    cout << " - data folder: " << strFolder << endl;
+    String inputFolder = parser.get<String>("inputFolder");
+    if (inputFolder.empty())
+        inputFolder = string(DEFAULT_DATASET_FOLDER);
+    cout << " - input data folder: " << inputFolder << endl;
+
+    String outputFolder = parser.get<String>("outputFolder");
+    if (outputFolder.empty())
+        outputFolder = string(DEFAULT_OUTPUT_FOLDER);
+    cout << " - output data folder: " << outputFolder << endl;
 
     bool bUndistortImg = parser.get<bool>("undistort");
     cout << " - bUndistortImg: " << bUndistortImg << endl;
     bool bEqualizeImg = parser.get<bool>("equalize");
     cout << " - bEqualizeImg: " << bEqualizeImg << endl;
+    bool bRemoveOE = parser.get<bool>("removeOE");
+    cout << " - bRemoveOE: " << bRemoveOE << endl;
 
     /// read images
     vector<string> vImgFiles;
     vector<double> vTimeStamps;
     // cv::glob(str_folder, vImgFiles);
-    readImagesSE2(strFolder, vImgFiles, vTimeStamps);
+    readImagesSE2(inputFolder, vImgFiles, vTimeStamps);
     const int nImgSize = vImgFiles.size();
     if (nImgSize == 0)
         return -1;
-    // LOGI("Read " << nImgSize << " Images in the folder: " << str_folder);
 
+#if 0
     /// subregion params
     const int nImgWid = IMAGE_WIDTH;
     const int nImgHgt = IMAGE_HEIGHT;
@@ -101,15 +114,15 @@ int main(int argc, char* argv[])
             vSubregins[idx] = Rect(x, y, w, h);
         }
     }
+#endif
 
-    // auto pDetector = cv::ORB::create(MAX_FEATURE_NUM, PYRAMID_SCALE_FATOR, MAX_PYRAMID_LEVEL);
-    Ptr<ORBextractor> pDetector = makePtr<ORBextractor>(ORBextractor(200, 1.5f, 3, 25, 15));
+    Ptr<ORBextractor> pDetector = makePtr<ORBextractor>(ORBextractor(500, 2.0f, 3, 25, 15));
     Ptr<DescriptorMatcher> pMatcher = DescriptorMatcher::create("BruteForce-Hamming");
     Ptr<CLAHE> claher = createCLAHE(2.0, Size(6, 6));
 
     /// data
     size_t nKPs1, nKPs2;
-    Mat image1, image2, imageOut;
+    Mat image1, image2, imageOut, mask;
     Mat descriptors1, descriptors2;
     vector<KeyPoint> vFeatures1, vFeatures2;
     vector<DMatch> vRoughMatches, vFineMatches;
@@ -127,11 +140,15 @@ int main(int argc, char* argv[])
     cout << endl << "K = " << K << endl;
     cout << "D = " << D << endl;
 
+    int refIdx = 0;
+    char waterlog[64], imgFile[64];
+    Mat kernel1 = getStructuringElement(MORPH_RECT, Size(5,5));
+    Mat kernel2 = getStructuringElement(MORPH_RECT, Size(15,15));
     vector<int> overLapping{0, 0};
     for (int k = 0; k < nImgSize; ++k) {
         image2 = imread(vImgFiles[k], IMREAD_GRAYSCALE);
         if (image2.empty()) {
-            // LOGW("Empty image #" << k << ": " << vImgFiles[k]);
+            cerr << "Open image error: " << vImgFiles[k] << endl;
             continue;
         }
 
@@ -143,32 +160,54 @@ int main(int argc, char* argv[])
         if (bEqualizeImg)
             claher->apply(image2, image2);
 
-        (*pDetector)(image2, cv::noArray(), vFeatures2, descriptors2, overLapping);
+        if (bRemoveOE) {
+            threshold(image2, mask, 200, 255, THRESH_BINARY_INV);
+            dilate(mask, mask, kernel1);
+            erode(mask, mask, kernel2);
+        } else {
+            mask = cv::noArray().getMat();
+        }
+
+        (*pDetector)(image2, mask, vFeatures2, descriptors2, overLapping);
 
         if (k > 0) {
             pMatcher->match(descriptors1, descriptors2, vRoughMatches);
             drawMatches(image1, vFeatures1, image2, vFeatures2, vRoughMatches, imageOut);
+            snprintf(waterlog, 64, "BF matches for #%d & #%d, %ld", refIdx, k, vRoughMatches.size());
+            putText(imageOut, waterlog, Point(50,50), FONT_HERSHEY_PLAIN, 1, Scalar(0,0,255));
+            snprintf(imgFile, 64, "%s/%sBF_match_%04d.jpg", outputFolder.c_str(), OUTPUT_FILE_PREFIX, k);
+            imwrite(imgFile, imageOut);
             imshow("Match BF", imageOut);
             waitKey(1);
 
             // gms
             std::vector<bool> vbInliers;
             GMS::gms_matcher gms(vFeatures1, image1.size(), vFeatures2, image2.size(), vRoughMatches);
-            int num_inliers = gms.GetInlierMask(vbInliers, false, false);
+            int num_inliers = gms.GetInlierMask(vbInliers, false, true);
             cout << "GMS Get total " << num_inliers << " matches." << endl;
+
+            vFineMatches.clear();
+            vFineMatches.reserve(vRoughMatches.size());
             for (int i = 0; i < vbInliers.size(); ++i) {
                 if (vbInliers[i])
                     vFineMatches.push_back(vRoughMatches[i]);
             }
             drawMatches(image1, vFeatures1, image2, vFeatures2, vFineMatches, imageOut);
+            snprintf(waterlog, 64, "GMS matches for #%d & #%d, %ld", refIdx, k, vFineMatches.size());
+            putText(imageOut, waterlog, Point(50,50), FONT_HERSHEY_PLAIN, 1, Scalar(0,0,255));
+            snprintf(imgFile, 64, "%s/%sGMS_match_%04d.jpg", outputFolder.c_str(), OUTPUT_FILE_PREFIX, k);
+            imwrite(imgFile, imageOut);
             imshow("Match GMS", imageOut);
             waitKey(50);
         }
 
         // swap data
-        image1 = image2.clone();
-        descriptors1 = descriptors2.clone();
-        vFeatures1.swap(vFeatures2);
+        if (k % 10 == 0) {
+            refIdx = k;
+            image1 = image2.clone();
+            descriptors1 = descriptors2.clone();
+            vFeatures1.swap(vFeatures2);
+        }
     }
 
     return 0;
@@ -177,12 +216,12 @@ int main(int argc, char* argv[])
 void readImagesSE2(const string& strImagePath, vector<string>& vstrImages, vector<double>& vTimeStamps)
 {
     const size_t numImgs = 3108;
-    vstrImages.resize(numImgs);
-    vTimeStamps.resize(numImgs);
+    vstrImages.reserve(numImgs);
+    vTimeStamps.reserve(numImgs);
     double time = 6000000 * 1e-9;
-    for (int i = 0; i < numImgs; ++i) {
-        vstrImages[i] = strImagePath + "/" + to_string(i) + ".bmp";
-        vTimeStamps[i] = time;
+    for (int i = 200; i < numImgs; ++i) {
+        vstrImages.push_back(strImagePath + "/" + to_string(i) + ".bmp");
+        vTimeStamps.push_back(time);
         time += 0.03 * 1e-9;
     }
 

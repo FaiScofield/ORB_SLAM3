@@ -65,6 +65,8 @@
 using namespace cv;
 using namespace std;
 
+#define ENABLE_DEBUG_INTERMEDIATE_DATA 0
+#define DEBUG_OUTPUT_FOLDER "/home/vance/output/orb/"
 namespace ORB_SLAM3
 {
 
@@ -431,6 +433,7 @@ ORBextractor::ORBextractor(int _nfeatures, float _scaleFactor, int _nlevels, int
     }
 
     mvImagePyramid.resize(nlevels);
+    mvMaskPyramid.resize(nlevels);
 
     mnFeaturesPerLevel.resize(nlevels);
     float factor = 1.0f / scaleFactor;
@@ -812,7 +815,85 @@ void ORBextractor::ComputeKeyPointsOctTree(vector<vector<KeyPoint>>& allKeypoint
                         vToDistributeKeys.push_back(*vit);
                     }
                 }
+            #if 0 && ENABLE_DEBUG_INTERMEDIATE_DATA
+                const int waitTime = (level + 1) * 50;
+                Mat tmpImg, tmpOut;
+                bitwise_and(mvImagePyramid[level], mvMaskPyramid[level], tmpImg);
+                vector<KeyPoint> tmpKP1, tmpKP2;
+                if (!vToDistributeKeys.empty()) {
+                    tmpKP1.reserve(vToDistributeKeys.size());
+                    for (auto vit = vToDistributeKeys.begin(); vit != vToDistributeKeys.end(); vit++) {
+                        KeyPoint kp = (*vit);
+                        kp.pt.x += minBorderX;
+                        kp.pt.y += minBorderY;
+                        tmpKP1.push_back(kp);
+                    }
+                    drawKeypoints(tmpImg, tmpKP1, tmpOut, Scalar(0,255,0));
+                }
+                if (!vKeysCell.empty()) {
+                    tmpKP2.reserve(vKeysCell.size());
+                    for (auto vit = vKeysCell.begin(); vit != vKeysCell.end(); vit++) {
+                        KeyPoint kp = (*vit);
+                        kp.pt.x += minBorderX;
+                        kp.pt.y += minBorderY;
+                        tmpKP2.push_back(kp);
+                    }
+                    if (!tmpOut.empty()) {
+                        drawKeypoints(tmpOut, tmpKP2, tmpOut, Scalar(0,0,255));
+                        imshow("vToDistributeKeys org", tmpOut);
+                        waitKey(waitTime);
+                    }
+                }
+            #endif
             }
+        }
+
+        #if ENABLE_DEBUG_INTERMEDIATE_DATA
+            const int waitTime = (level + 1) * 50;
+            Mat tmpOut;
+            vector<KeyPoint> tmpKP;
+            tmpKP.reserve(vToDistributeKeys.size());
+            for (auto vit = vToDistributeKeys.begin(); vit != vToDistributeKeys.end(); vit++) {
+                KeyPoint kp = (*vit);
+                kp.pt.x += minBorderX;
+                kp.pt.y += minBorderY;
+                tmpKP.push_back(kp);
+            }
+            drawKeypoints(mvImagePyramid[level], tmpKP, tmpOut, Scalar(0,255,0));
+            imshow("vToDistributeKeys org", tmpOut);
+            waitKey(waitTime);
+        #endif
+
+        if (bWithMask) {
+            const size_t n = vToDistributeKeys.size();
+            vector<cv::KeyPoint> vFeatureOnMask;
+            vFeatureOnMask.reserve(n);
+
+            for (auto vit = vToDistributeKeys.begin(); vit != vToDistributeKeys.end(); vit++) {
+                Point2f posi = (*vit).pt;
+                posi.x += minBorderX;
+                posi.y += minBorderY;
+                if (mvMaskPyramid[level].at<uchar>(posi) > 0)
+                    vFeatureOnMask.push_back(*vit);
+            }
+            vFeatureOnMask.swap(vToDistributeKeys);
+
+        #if ENABLE_DEBUG_INTERMEDIATE_DATA
+            const int waitTime = (level + 1) * 50;
+            Mat tmpImg, tmpOut;
+            bitwise_and(mvImagePyramid[level], mvMaskPyramid[level], tmpImg);
+            vector<KeyPoint> tmpKP;
+            tmpKP.reserve(vToDistributeKeys.size());
+            for (auto vit = vToDistributeKeys.begin(); vit != vToDistributeKeys.end(); vit++) {
+                KeyPoint kp = (*vit);
+                kp.pt.x += minBorderX;
+                kp.pt.y += minBorderY;
+                tmpKP.push_back(kp);
+            }
+            drawKeypoints(tmpImg, tmpKP, tmpOut, Scalar(0,255,0));
+            imshow("vToDistributeKeys with mask", tmpOut);
+            waitKey(0);
+        #endif
         }
 
         vector<KeyPoint>& keypoints = allKeypoints[level];
@@ -1015,7 +1096,7 @@ int ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoin
     assert(image.type() == CV_8UC1);
 
     // Pre-compute the scale pyramid
-    ComputePyramid(image);
+    ComputePyramid(_image, _mask);
 
     vector<vector<KeyPoint>> allKeypoints;
     ComputeKeyPointsOctTree(allKeypoints);
@@ -1085,25 +1166,48 @@ int ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoin
     return monoIndex;
 }
 
-void ORBextractor::ComputePyramid(cv::Mat image)
+void ORBextractor::ComputePyramid(cv::InputArray _image, cv::InputArray _mask)
 {
+    Mat image = _image.getMat();
+    Mat mask = _mask.getMat();
+
+    bWithMask = !mask.empty();
+    if (!bWithMask) {
+        mask = Mat::zeros(image.size(), CV_8UC1);
+        mask.setTo(255);
+    }
+    assert(mask.rows == image.rows && mask.cols == image.cols);
+
     for (int level = 0; level < nlevels; ++level) {
         float scale = mvInvScaleFactor[level];
         Size sz(cvRound((float)image.cols * scale), cvRound((float)image.rows * scale));
         Size wholeSize(sz.width + EDGE_THRESHOLD * 2, sz.height + EDGE_THRESHOLD * 2);
-        Mat temp(wholeSize, image.type()), masktemp;
+        Mat temp(wholeSize, image.type()), masktemp(wholeSize, CV_8UC1);
         mvImagePyramid[level] = temp(Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
+        mvMaskPyramid[level] = masktemp(Rect(EDGE_THRESHOLD, EDGE_THRESHOLD, sz.width, sz.height));
 
         // Compute the resized image
         if (level != 0) {
             resize(mvImagePyramid[level - 1], mvImagePyramid[level], sz, 0, 0, INTER_LINEAR);
+            resize(mvMaskPyramid[level - 1], mvMaskPyramid[level], sz, 0, 0, INTER_NEAREST);
 
             copyMakeBorder(mvImagePyramid[level], temp, EDGE_THRESHOLD, EDGE_THRESHOLD,
+                           EDGE_THRESHOLD, EDGE_THRESHOLD, BORDER_REFLECT_101 + BORDER_ISOLATED);
+            copyMakeBorder(mvMaskPyramid[level], masktemp, EDGE_THRESHOLD, EDGE_THRESHOLD,
                            EDGE_THRESHOLD, EDGE_THRESHOLD, BORDER_REFLECT_101 + BORDER_ISOLATED);
         } else {
             copyMakeBorder(image, temp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
                            EDGE_THRESHOLD, BORDER_REFLECT_101);
+            copyMakeBorder(mask, masktemp, EDGE_THRESHOLD, EDGE_THRESHOLD, EDGE_THRESHOLD,
+                           EDGE_THRESHOLD, BORDER_REFLECT_101);
         }
+    #if ENABLE_DEBUG_INTERMEDIATE_DATA
+        char imgFile[64];
+        snprintf(imgFile, 64, "%s/imagePyr_level_%d.jpg", DEBUG_OUTPUT_FOLDER, level);
+        imwrite(imgFile, mvImagePyramid[level]);
+        snprintf(imgFile, 64, "%s/maskPyr_level_%d.jpg", DEBUG_OUTPUT_FOLDER, level);
+        imwrite(imgFile, mvMaskPyramid[level]);
+    #endif
     }
 }
 
