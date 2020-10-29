@@ -12,7 +12,7 @@ AccessModifierOffset: -4
 # 开括号换行后是否对齐左边的括号: Align, DontAlign, AlwaysBreak
 AlignAfterOpenBracket: Align
 # 对齐连续赋值的等号
-AlignConsecutiveAssignments: true
+AlignConsecutiveAssignments: false
 # 对齐连续声明变量
 AlignConsecutiveDeclarations: false
 # 对齐连续声明的宏
@@ -177,7 +177,7 @@ PenaltyExcessCharacter: 1
 PenaltyReturnTypeOnItsOwnLine: 5
 
 # 指针对齐位置: Left, Right, Middle
-PointerAlignment: Right
+PointerAlignment: Left
 # PointerBindsToType: true
 # RawStringFormats:
 # 注释自动排版
