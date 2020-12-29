@@ -1,7 +1,4 @@
-#include "CameraModels/Pinhole.h"
-#include "Frame.h"
 #include "ORBextractor.h"
-#include "ORBmatcher.h"
 #include "gms_matcher.h"
 
 #include <boost/filesystem.hpp>
@@ -9,6 +6,7 @@
 #include <opencv2/features2d.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/tracking.hpp>
 #include <vector>
 
 #define ENABLE_SAVE_RESULT 1
@@ -82,30 +80,14 @@ int main(int argc, char* argv[])
 #endif
 
     /// classes
-    ORBextractor detector(300, 2, 3, 11, 7);
-    Ptr<CLAHE> claher = createCLAHE(2.0, Size(6, 6));
+    Ptr<CLAHE> pClaher = createCLAHE(2.0, Size(6, 6));
+    Ptr<ORBextractor> pDetector = makePtr<ORBextractor>(ORBextractor(500, 2, 3, 25, 15));
 
-    vector<float> vCamCalib{207.9359613169054, 207.4159055585876, 160.5827136112504, 117.7328673795551};
-    Ptr<GeometricCamera> pCamera = Ptr<GeometricCamera>(dynamic_cast<GeometricCamera*>(new Pinhole(vCamCalib)));
-    Ptr<ORBextractor> pDetector = makePtr<ORBextractor>(ORBextractor(300, 2, 3, 11, 7));
-    Ptr<ORBmatcher> pMatcher = makePtr<ORBmatcher>(ORBmatcher(0.6, true));
-    if (bUseGMS) {
-        pMatcher->setCheckOrientation(false);
-    }
-    Ptr<ORBVocabulary> pVocabulary = makePtr<ORBVocabulary>(ORBVocabulary());
-    if (!pVocabulary->loadFromBinaryFile(g_vocabularyFile)) {
-        cerr << "Wrong path to vocabulary. " << endl;
-        cerr << "Falied to open at: " << g_vocabularyFile << endl;
-        exit(-1);
-    }
-    cout << "Vocabulary loaded!" << endl << endl;
 
-    Frame frameCur, frameRef;
-    Mat img, gray, grayEq, mask, outImg;
-    vector<Point2f> vPrevMatched;
+    Mat imgRef, imgCur, grayRef, grayCur, grayEq, mask, outImg;
+    vector<Point2f> vKPsRef, vKPsCur, vPrevMatched;
     vector<int> vMatches12;
     vector<DMatch> vDMatches, vDMatchesRefine;
-    vector<int> vLappingArea = {0, 1000};
     const Mat kernel1 = getStructuringElement(MORPH_RECT, Size(5, 5));
     const Mat kernel2 = getStructuringElement(MORPH_RECT, Size(15, 15));
 
@@ -114,63 +96,87 @@ int main(int argc, char* argv[])
     for (int k = 0, kend = vStrImages.size(); k < kend; ++k) {
         cout << "#" << k << " Dealing with img " << vStrImages[k] << endl;
 
-        img = imread(vStrImages[k], IMREAD_COLOR);
-        if (img.empty()) {
+        imgCur = imread(vStrImages[k], IMREAD_COLOR);
+        if (imgCur.empty()) {
             cerr << "Open image error: " << vStrImages[k] << endl;
             continue;
         }
 
-        cvtColor(img, gray, COLOR_BGR2GRAY);
+        cvtColor(imgCur, grayCur, COLOR_BGR2GRAY);
         if (bUndistortImg) {
             Mat imgUn;
-            cv::undistort(gray, imgUn, K, D);
-            imgUn.copyTo(gray);
+            cv::undistort(grayCur, imgUn, K, D);
+            imgUn.copyTo(grayCur);
+            cv::undistort(imgCur, imgUn, K, D);
+            imgUn.copyTo(imgCur);
         }
 
         if (bRemoveOE) {
-            threshold(gray, mask, 200, 255, THRESH_BINARY_INV);
+            threshold(grayCur, mask, 200, 255, THRESH_BINARY_INV);
             dilate(mask, mask, kernel1);
             erode(mask, mask, kernel2);
+            mask.rowRange(0, 20).setTo(0);
+            mask.rowRange(mask.rows - 20, mask.rows).setTo(0);
+            mask.colRange(0, 20).setTo(0);
+            mask.colRange(mask.cols - 20, mask.cols).setTo(0);
         } else {
             mask = cv::noArray().getMat();
         }
 
         if (bEqualizeImg) {
-            claher->apply(gray, grayEq);
-            grayEq.copyTo(gray);
+            pClaher->apply(grayCur, grayEq);
+            grayEq.copyTo(grayCur);
         }
 
-        // frame construction
-        Mat noDistort = cv::Mat::zeros(4, 1, CV_32FC1);
-        if (bRemoveOE) {
-            frameCur = Frame(gray, mask, vTimeStamps[k], pDetector.get(), pVocabulary.get(),
-                             pCamera.get(), noDistort, 0, 0);
-        } else {
-            frameCur = Frame(gray, vTimeStamps[k], pDetector.get(), pVocabulary.get(),
-                             pCamera.get(), noDistort, 0, 0);
+        // base frame
+        if (k % 8 == 0) {
+            nBaseIdx = k;
+            goodFeaturesToTrack(grayCur, vKPsRef, 300, 0.01, 15, mask);
+            imgRef = imgCur.clone();
+            grayRef = grayCur.clone();
+            vPrevMatched = vKPsRef;
+            continue;
         }
-        frameCur.imgLeft = gray.clone();
 
-        int nMatches;
         if (k > 0) {
-            nMatches = pMatcher->SearchForInitialization(frameRef, frameCur, vPrevMatched, vMatches12, 50);
+            Mat tmpShow = imgCur.clone();
+            vector<KeyPoint> tmpKP;
+            KeyPoint::convert(vPrevMatched, tmpKP);
+            drawKeypoints(imgCur, tmpKP, tmpShow, Scalar(255,0,0));
+
+
+            vector<uchar> vTrackFlags;
+            vector<float> vTrackErrors;
+            calcOpticalFlowPyrLK(grayRef, grayCur, vPrevMatched, vKPsCur, vTrackFlags, vTrackErrors, Size(32,32));
+
+            KeyPoint::convert(vKPsCur, tmpKP);
+            drawKeypoints(tmpShow, tmpKP, tmpShow, Scalar(0,255,0));
+            imshow("KPs prev(blue) & curr(gren)", tmpShow);
+            waitKey(10);
 
             vDMatches.clear();
-            vDMatches.reserve(vMatches12.size());
-            for (size_t i = 0; i < vMatches12.size(); ++i) {
-                if (vMatches12[i] >= 0 && vMatches12[i] < (int)frameCur.mvKeys.size()) {
-                    vDMatches.emplace_back(i, vMatches12[i], 1);
+            vDMatches.reserve(vTrackFlags.size());
+            int nMatches = 0;
+            for (size_t i = 0; i < vTrackFlags.size(); ++i) {
+                if (vTrackFlags[i]) {
+                    vDMatches.emplace_back(i, i, 1);
+                    nMatches++;
                 }
             }
+            if (nMatches < 5) {
+                cerr << "Too less matches! " << nMatches << endl;
+                continue;
+            }
 
-            hconcat(frameRef.imgLeft, frameCur.imgLeft, outImg);
-            drawMatches(frameRef.imgLeft, frameRef.mvKeys, frameCur.imgLeft, frameCur.mvKeys,
-                        vDMatches, outImg, Scalar(255, 0, 0));
+            vector<KeyPoint> vKPs1, vKPs2;
+            KeyPoint::convert(vKPsRef, vKPs1);
+            KeyPoint::convert(vKPsCur, vKPs2);
+            drawMatches(imgRef, vKPs1, imgCur, vKPs2, vDMatches, outImg, Scalar(255, 0, 0));
 
             // gms
             if (bUseGMS) {
                 std::vector<bool> vbInliers;
-                GMS::gms_matcher gms(frameRef.mvKeysUn, gray.size(), frameCur.mvKeysUn, gray.size(), vDMatches);
+                GMS::gms_matcher gms(vKPs1, grayRef.size(), vKPs2, grayCur.size(), vDMatches);
                 nMatches = gms.GetInlierMask(vbInliers, false, true);
                 cout << "GMS Get total " << nMatches << " matches." << endl;
 
@@ -181,31 +187,31 @@ int main(int argc, char* argv[])
                         vDMatchesRefine.push_back(vDMatches[i]);
                     }
                 }
-                drawMatches(frameRef.imgLeft, frameRef.mvKeys, frameCur.imgLeft, frameCur.mvKeys,
-                            vDMatchesRefine, outImg, Scalar(0, 255, 0));
+                drawMatches(imgRef, vKPs1, imgCur, vKPs2, vDMatchesRefine, outImg, Scalar(0, 255, 0));
                 vDMatches.swap(vDMatchesRefine);
             }
 
             aveMatches[k - nBaseIdx - 1] += nMatches;
             const int nAveMatches = aveMatches[k - nBaseIdx - 1] / (nBaseIdx / 10 + 1);
-            cout << "#" << nBaseIdx << " to #" << k << ", matches: " << nMatches
+            cout << "#" << k << " to #" << nBaseIdx << ", matches: " << nMatches
                  << ", ave matches: " << nAveMatches << endl;
 
-            char waterMark[64];
+            char waterMark[64], imgFile[128];
             snprintf(waterMark, 64, "Idx: %d - %d, matches: %d, ave: %d", nBaseIdx, k, nMatches, nAveMatches);
             putText(outImg, waterMark, Point(50, 50), FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 255));
-            imshow("ORB features matches", outImg);
+            imshow("KLT features matches", outImg);
             waitKey(1);
+            snprintf(imgFile, 128, "%s/KLT_matches_%03d_to_%03d.jpg", outputFolder.c_str(), nBaseIdx, k);
+            imwrite(imgFile, outImg);
 
             // Warp
             if (vDMatches.size() > 4) {
-
                 vector<Point2f> vFeatures1, vFeatures2;
                 vFeatures1.reserve(vDMatches.size());
                 vFeatures2.reserve(vDMatches.size());
                 for (DMatch& m : vDMatches) {
-                    vFeatures1.push_back(frameRef.mvKeysUn[m.queryIdx].pt);
-                    vFeatures2.push_back(frameCur.mvKeysUn[m.trainIdx].pt);
+                    vFeatures1.push_back(vKPsRef[m.queryIdx]);
+                    vFeatures2.push_back(vKPsCur[m.trainIdx]);
                 }
                 Mat H, A;
                 vector<uchar> inliers;
@@ -217,29 +223,23 @@ int main(int argc, char* argv[])
                 Mat blendOut, blendH, blendA;
                 Mat warpH, warpA;
                 if (!H.empty())
-                    warpPerspective(gray, warpH, H, gray.size());
+                    warpPerspective(imgCur, warpH, H, imgCur.size());
                 else
-                    warpH = Mat::zeros(gray.size(), gray.depth());
+                    warpH = Mat::zeros(imgCur.size(), imgCur.depth());
                 if (!A.empty())
-                    warpAffine(gray, warpA, A, gray.size());
+                    warpAffine(imgCur, warpA, A, imgCur.size());
                 else
-                    warpA = Mat::zeros(gray.size(), gray.depth());
-                addWeighted(frameRef.imgLeft, 0.5, warpH, 0.5, 0, blendH);
-                addWeighted(frameRef.imgLeft, 0.5, warpA, 0.5, 0, blendA);
+                    warpA = Mat::zeros(imgCur.size(), imgCur.depth());
+                addWeighted(imgRef, 0.5, warpH, 0.5, 0, blendH);
+                addWeighted(imgRef, 0.5, warpA, 0.5, 0, blendA);
                 hconcat(blendH, blendA, blendOut);
                 imshow("Warpe Idmages H/A", blendOut);
                 waitKey(100);
             }
-        }
-
-        if (k % 8 == 0 || nMatches < 10) {
-            nBaseIdx = k;
-            frameRef = frameCur;
-            KeyPoint::convert(frameCur.mvKeys, vPrevMatched);
-        }
+        }   // if k
 
         // swap keyframe
-        KeyPoint::convert(frameCur.mvKeys, vPrevMatched);
+        vPrevMatched = vKPsCur;
     }
 
     cout << "Done." << endl;

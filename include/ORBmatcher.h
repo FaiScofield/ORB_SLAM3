@@ -37,6 +37,9 @@ class ORBmatcher
 public:
     ORBmatcher(float nnratio = 0.6, bool checkOri = true);
 
+    void setRatio(float r) { mfNNratio = r; }
+    void setCheckOrientation(bool flag) { mbCheckOrientation = flag; }
+
     // Computes the Hamming distance between two ORB descriptors
     static int DescriptorDistance(const cv::Mat& a, const cv::Mat& b);
 

@@ -191,7 +191,11 @@ add_executable(test_orbDetector test/test_orbDetector.cpp)
 target_link_libraries(test_orbDetector ${PROJECT_NAME} ${Boost_LIBRARIES})
 add_executable(test_orbMatcher test/test_orbMatcher.cpp)
 target_link_libraries(test_orbMatcher ${PROJECT_NAME} ${Boost_LIBRARIES})
-add_executable(test_featureExtract 
-	test/test_featureExtract.cpp
-	test/gms_matcher.h)
+add_executable(test_featureExtract
+    test/test_featureExtract.cpp
+    test/gms_matcher.h)
 target_link_libraries(test_featureExtract ${PROJECT_NAME})
+add_executable(test_kltTracking
+    test/test_kltTracking.cpp
+    test/gms_matcher.h)
+target_link_libraries(test_kltTracking ${PROJECT_NAME} ${Boost_LIBRARIES})

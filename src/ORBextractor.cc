@@ -101,6 +101,13 @@ static float IC_Angle(const Mat& image, Point2f pt, const vector<int>& u_max)
     return fastAtan2((float)m_01, (float)m_10);
 }
 
+static uchar get_value(const uchar* center, const Point* pattern, float a, float b, int step, int idx)
+{
+    int x = cvRound(pattern[idx].x * b + pattern[idx].y * a) * step;
+    int y = cvRound(pattern[idx].x * a - pattern[idx].y * b);
+    return center[x + y];
+}
+
 
 const float factorPI = (float)(CV_PI / 180.f);
 static void computeOrbDescriptor(const KeyPoint& kpt, const Mat& img, const Point* pattern, uchar* desc)
@@ -115,7 +122,7 @@ static void computeOrbDescriptor(const KeyPoint& kpt, const Mat& img, const Poin
     center[cvRound(pattern[idx].x * b + pattern[idx].y * a) * step + \
            cvRound(pattern[idx].x * a - pattern[idx].y * b)]
 
-
+#if 1
     for (int i = 0; i < 32; ++i, pattern += 16) {
         int t0, t1, val;
         t0 = GET_VALUE(0);
@@ -145,6 +152,37 @@ static void computeOrbDescriptor(const KeyPoint& kpt, const Mat& img, const Poin
 
         desc[i] = (uchar)val;
     }
+#else
+    for (int i = 0; i < 32; ++i, pattern += 16) {
+        int t0, t1, val;
+        t0 = get_value(center, pattern, a, b, step, 0);
+        t1 = get_value(center, pattern, a, b, step, 1);
+        val = t0 < t1;
+        t0 = get_value(center, pattern, a, b, step, 2);
+        t1 = get_value(center, pattern, a, b, step, 3);
+        val |= (t0 < t1) << 1;
+        t0 = get_value(center, pattern, a, b, step, 4);
+        t1 = get_value(center, pattern, a, b, step, 5);
+        val |= (t0 < t1) << 2;
+        t0 = get_value(center, pattern, a, b, step, 6);
+        t1 = get_value(center, pattern, a, b, step, 7);
+        val |= (t0 < t1) << 3;
+        t0 = get_value(center, pattern, a, b, step, 8);
+        t1 = get_value(center, pattern, a, b, step, 9);
+        val |= (t0 < t1) << 4;
+        t0 = get_value(center, pattern, a, b, step, 10);
+        t1 = get_value(center, pattern, a, b, step, 11);
+        val |= (t0 < t1) << 5;
+        t0 = get_value(center, pattern, a, b, step, 12);
+        t1 = get_value(center, pattern, a, b, step, 13);
+        val |= (t0 < t1) << 6;
+        t0 = get_value(center, pattern, a, b, step, 14);
+        t1 = get_value(center, pattern, a, b, step, 15);
+        val |= (t0 < t1) << 7;
+
+        desc[i] = (uchar)val;
+    }
+#endif
 
 #undef GET_VALUE
 }
@@ -1066,10 +1104,21 @@ void ORBextractor::ComputeKeyPointsOld(std::vector<std::vector<KeyPoint>>& allKe
 static void computeDescriptors(const Mat& image, vector<KeyPoint>& keypoints, Mat& descriptors,
                                const vector<Point>& pattern)
 {
-    descriptors = Mat::zeros((int)keypoints.size(), 32, CV_8UC1);
+    const size_t N = keypoints.size();
+    descriptors = Mat::zeros((int)N, 32, CV_8UC1);
 
-    for (size_t i = 0; i < keypoints.size(); i++)
-        computeOrbDescriptor(keypoints[i], image, &pattern[0], descriptors.ptr((int)i));
+    const int x_limit = image.cols - EDGE_THRESHOLD;
+    const int y_limit = image.rows - EDGE_THRESHOLD;
+
+    int nOutliers = 0;
+    for (size_t i = 0; i < N; i++) {
+        if (keypoints[i].pt.x >= EDGE_THRESHOLD && keypoints[i].pt.y >= EDGE_THRESHOLD &&
+            keypoints[i].pt.x < x_limit && keypoints[i].pt.y < y_limit)
+            computeOrbDescriptor(keypoints[i], image, &pattern[0], descriptors.ptr((int)i));
+        else
+            nOutliers++;
+    }
+    cout << "computeDescriptors(): number outliers: " << nOutliers << " / " << N << endl;
 }
 
 int ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoint>& _keypoints,
@@ -1196,6 +1245,16 @@ void ORBextractor::ComputePyramid(cv::InputArray _image, cv::InputArray _mask)
         imwrite(imgFile, mvMaskPyramid[level]);
 #endif
     }
+}
+
+int ORBextractor::compute(InputArray _image, vector<KeyPoint>& _keypoints, OutputArray _descriptors)
+{
+    Mat img = _image.getMat();
+    Mat desc = _descriptors.getMat();
+
+    computeDescriptors(img, _keypoints, desc, pattern);
+
+    return 0;
 }
 
 }  // namespace ORB_SLAM3

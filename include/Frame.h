@@ -32,8 +32,10 @@
 #include <vector>
 
 namespace ORB_SLAM3 {
-#define FRAME_GRID_ROWS 48
-#define FRAME_GRID_COLS 64
+//#define FRAME_GRID_ROWS 48
+//#define FRAME_GRID_COLS 64
+#define FRAME_GRID_ROWS 24
+#define FRAME_GRID_COLS 32
 
 class MapPoint;
 class KeyFrame;

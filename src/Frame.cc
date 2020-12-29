@@ -31,7 +31,16 @@
 #include <include/CameraModels/Pinhole.h>
 #include <thread>
 
+#define ENABLE_DEBUG_FRAME 1
+
+#if ENABLE_DEBUG_FRAME
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+using namespace cv;
+#endif
+
 namespace ORB_SLAM3 {
+
 
 long unsigned int Frame::nNextId = 0;
 bool Frame::mbInitialComputations = true;
@@ -234,9 +243,7 @@ Frame::Frame(const cv::Mat& imGray, const cv::Mat& imDepth, const double& timeSt
                        .count();
 #endif
 
-
     N = mvKeys.size();
-
     if (mvKeys.empty())
         return;
 
@@ -326,6 +333,8 @@ Frame::Frame(const cv::Mat& imGray, const double& timeStamp, ORBextractor* extra
     N = mvKeys.size();
     if (mvKeys.empty())
         return;
+
+    imgLeft = imGray.clone();
 
     UndistortKeyPoints();
 
@@ -427,6 +436,8 @@ Frame::Frame(const cv::Mat& imGray, const cv::Mat& mask, const double& timeStamp
     if (mvKeys.empty())
         return;
 
+    imgLeft = imGray.clone();
+
     UndistortKeyPoints();
 
     // Set no stereo information
@@ -513,17 +524,52 @@ void Frame::AssignFeaturesToGrid()
                 mGridRight[nGridPosX][nGridPosY].push_back(i - Nleft);
         }
     }
+
+#if ENABLE_DEBUG_FRAME && 0
+    // draw grid points
+    Mat tmpShow = imgLeft.clone();
+    resize(tmpShow, tmpShow, Size(imgLeft.cols*2, imgLeft.rows*2));
+    if (tmpShow.channels() == 1) {
+        cvtColor(tmpShow, tmpShow, COLOR_GRAY2BGR);
+    }
+    for (unsigned int i = 0; i < FRAME_GRID_COLS; i++) {
+        const float cell_tl_x = i / mfGridElementWidthInv;
+        const float cell_ct_x = (i + 0.5) / mfGridElementWidthInv;
+        line(tmpShow, Point(cell_tl_x*2, mnMinY*2), Point(cell_tl_x*2, mnMaxY*2), Scalar(255, 0, 0));
+        for (unsigned int j = 0; j < FRAME_GRID_ROWS; j++) {
+            const float cell_tl_y = j / mfGridElementHeightInv;
+            const float cell_ct_y = (j + 0.5) / mfGridElementHeightInv;
+            line(tmpShow, Point(mnMinX*2, cell_tl_y*2), Point(mnMaxX*2, cell_tl_y*2), Scalar(255, 0, 0));
+            putText(tmpShow, to_string(mGrid[i][j].size()), Point(cell_ct_x*2, cell_ct_y*2),
+                    FONT_HERSHEY_COMPLEX_SMALL, 0.5, Scalar(0, 0, 255), 1);
+        }
+    }
+    imshow("AssignFeaturesToGrid", tmpShow);
+    waitKey(1);
+#endif
 }
 
 void Frame::ExtractORB(int flag, const cv::Mat& im, const int x0, const int x1)
 {
     vector<int> vLapping = {x0, x1};
-    if (flag == 0)
+    if (flag == 0) {
         // monoLeft = (*mpORBextractorLeft)(im, cv::Mat(), mvKeys, mDescriptors, vLapping);
         monoLeft = (*mpORBextractorLeft)(im, maskLeft, mvKeys, mDescriptors, vLapping);
-    else
+    } else {
         // monoRight = (*mpORBextractorRight)(im, cv::Mat(), mvKeysRight, mDescriptorsRight, vLapping);
         monoRight = (*mpORBextractorRight)(im, maskRight, mvKeysRight, mDescriptorsRight, vLapping);
+    }
+
+#if ENABLE_DEBUG_FRAME && 0
+    // draw all KPs
+    cv::Mat tmpShow = im;
+    // if (!maskLeft.empty()) {
+    //     cv::bitwise_and(im, maskLeft, tmpShow);
+    // }
+    cv::drawKeypoints(tmpShow, mvKeys, tmpShow, cv::Scalar(0, 255, 0));
+    cv::imshow("ExtractORB", tmpShow);
+    cv::waitKey(1);
+#endif
 }
 
 void Frame::SetPose(cv::Mat Tcw)
@@ -810,6 +856,32 @@ vector<size_t> Frame::GetFeaturesInArea(const float& x, const float& y, const fl
         }
     }
 
+#if ENABLE_DEBUG_FRAME && 0
+    // draw features in the area
+    Mat tmpShow = imgLeft.clone();
+    if (tmpShow.channels() == 1) {
+        cvtColor(tmpShow, tmpShow, COLOR_GRAY2BGR);
+    }
+    for (int x = nMinCellX; x <= nMaxCellX; ++x) {
+        line(tmpShow, Point(x / mfGridElementWidthInv, nMinCellY / mfGridElementHeightInv),
+             Point(x / mfGridElementWidthInv, nMaxCellY / mfGridElementHeightInv), Scalar(255, 0, 0));
+    }
+    for (int y = nMinCellY; y <= nMaxCellY; ++y) {
+        line(tmpShow, Point(nMinCellX / mfGridElementWidthInv, y / mfGridElementHeightInv),
+             Point(nMaxCellX / mfGridElementWidthInv, y / mfGridElementHeightInv), Scalar(255, 0, 0));
+    }
+    for (auto it = mvKeysUn.begin(); it != mvKeysUn.end(); ++it) {
+        circle(tmpShow, (*it).pt, 1, Scalar(255,0,0), -1);
+    }
+    circle(tmpShow, Point(x, y), r, Scalar(0, 0, 255), 2);
+    for (int i = 0; i < vIndices.size(); ++i) {
+        circle(tmpShow, mvKeysUn[vIndices[i]].pt, 1, Scalar(0,255,0), -1);
+    }
+    putText(tmpShow, to_string(vIndices.size()), Point(x, y), FONT_HERSHEY_COMPLEX_SMALL, 1, Scalar(0, 0, 255), 1);
+    imshow("GetFeaturesInArea", tmpShow);
+    waitKey(200);
+#endif
+
     return vIndices;
 }
 
@@ -863,6 +935,17 @@ void Frame::UndistortKeyPoints()
         kp.pt.y = mat.at<float>(i, 1);
         mvKeysUn[i] = kp;
     }
+
+#if ENABLE_DEBUG_FRAME
+    // draw undistorted KPs
+    cv::Mat imgUn, tmpShow1, tmpShow2, tmpShow3;
+    cv::drawKeypoints(imgLeft, mvKeys, tmpShow1, cv::Scalar(0, 255, 0));
+    cv::undistort(imgLeft, imgUn, static_cast<Pinhole*>(mpCamera)->toK(), mDistCoef);
+    cv::drawKeypoints(imgUn, mvKeysUn, tmpShow2, cv::Scalar(0, 255, 0));
+    cv::hconcat(tmpShow1, tmpShow2, tmpShow3);
+    cv::imshow("Undistor Keypoints", tmpShow3);
+    cv::waitKey(1);
+#endif
 }
 
 void Frame::ComputeImageBounds(const cv::Mat& imLeft)

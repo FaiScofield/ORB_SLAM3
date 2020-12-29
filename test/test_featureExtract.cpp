@@ -7,6 +7,7 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
 #include <vector>
 
 #define ENABLE_SAVE_RESULT 1
@@ -75,6 +76,8 @@ int main(int argc, char* argv[])
     cout << " - bEqualizeImg: " << bEqualizeImg << endl;
     bool bRemoveOE = parser.get<bool>("removeOE");
     cout << " - bRemoveOE: " << bRemoveOE << endl;
+    bool bSharpen = false;
+    cout << " - bSharpen: " << bSharpen << endl;
 
     /// read images
     vector<string> vImgFiles;
@@ -117,6 +120,7 @@ int main(int argc, char* argv[])
 #endif
 
     Ptr<ORBextractor> pDetector = makePtr<ORBextractor>(ORBextractor(500, 2.0f, 3, 25, 15));
+    Ptr<cv::ORB> pCvORB = cv::ORB::create(500, 2.0f, 3, 25, 15);
     Ptr<DescriptorMatcher> pMatcher = DescriptorMatcher::create("BruteForce-Hamming");
     Ptr<CLAHE> claher = createCLAHE(2.0, Size(6, 6));
 
@@ -124,6 +128,7 @@ int main(int argc, char* argv[])
     size_t nKPs1, nKPs2;
     Mat image1, image2, imageOut, mask;
     Mat descriptors1, descriptors2;
+    vector<Point2f> vPoints2;
     vector<KeyPoint> vFeatures1, vFeatures2;
     vector<DMatch> vRoughMatches, vFineMatches;
 
@@ -152,23 +157,45 @@ int main(int argc, char* argv[])
             continue;
         }
 
-        if (bUndistortImg) {
-            Mat imgUn;
-            cv::undistort(image2, imgUn, K, D);
-            imgUn.copyTo(image2);
-        }
-        if (bEqualizeImg)
+        float corner_th = 0.005;
+        if (bEqualizeImg) {
             claher->apply(image2, image2);
+            corner_th = 0.01;
+        }
 
         if (bRemoveOE) {
             threshold(image2, mask, 200, 255, THRESH_BINARY_INV);
             dilate(mask, mask, kernel1);
             erode(mask, mask, kernel2);
+            mask.rowRange(0, IMAGE_BORDER).setTo(0);
+            mask.rowRange(mask.rows - IMAGE_BORDER, mask.rows).setTo(0);
+            mask.colRange(0, IMAGE_BORDER).setTo(0);
+            mask.colRange(mask.cols - IMAGE_BORDER, mask.cols).setTo(0);
         } else {
             mask = cv::noArray().getMat();
         }
 
-        (*pDetector)(image2, mask, vFeatures2, descriptors2, overLapping);
+        Mat tmpImg;
+        if (bUndistortImg) {
+            cv::undistort(image2, tmpImg, K, D);
+            image2 = tmpImg;
+        }
+        if (bSharpen){
+            imshow("sharp before", image2);
+            waitKey(10);
+            Mat kernel = (Mat_<char>(3, 3) << 0, -1, 0, -1, 5, -1, 0, -1, 0);
+            filter2D(image2, tmpImg, CV_32F, kernel);
+            convertScaleAbs(tmpImg, image2);
+//            addWeighted(image2, 2, tmpImg, -1, 0, image2);
+            imshow("sharp after", image2);
+            waitKey(10);
+        }
+
+        // (*pDetector)(image2, mask, vFeatures2, descriptors2, overLapping);
+        goodFeaturesToTrack(image2, vPoints2, 300, corner_th, 15, mask, 3, false);
+//        cornerSubPix(image2, vPoints2, Size(5,5), Size(-1,-1), TermCriteria(TermCriteria::EPS | TermCriteria::COUNT, 20, 1e-5));
+        KeyPoint::convert(vPoints2, vFeatures2);
+        pDetector->compute(image2, vFeatures2, descriptors2);
 
         if (k > 0) {
             pMatcher->match(descriptors1, descriptors2, vRoughMatches);

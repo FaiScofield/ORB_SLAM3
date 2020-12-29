@@ -273,7 +273,8 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF, Frame& F, vector<MapPoint*>& vpMapPoi
     vector<int> rotHist[HISTO_LENGTH];
     for (int i = 0; i < HISTO_LENGTH; i++)
         rotHist[i].reserve(500);
-    const float factor = 1.0f / HISTO_LENGTH;
+    // const float factor = 1.0f/HISTO_LENGTH;  // BUG
+    const float factor = HISTO_LENGTH/360.f;
 
     // We perform the matching over ORB that belong to the same vocabulary node (at a certain level)
     DBoW2::FeatureVector::const_iterator KFit = vFeatVecKF.begin();
@@ -675,7 +676,8 @@ int ORBmatcher::SearchForInitialization(Frame& F1, Frame& F2, vector<cv::Point2f
     vector<int> rotHist[HISTO_LENGTH];
     for (int i = 0; i < HISTO_LENGTH; i++)
         rotHist[i].reserve(500);
-    const float factor = 1.0f / HISTO_LENGTH;
+    // const float factor = 1.0f/HISTO_LENGTH;  // BUG
+    const float factor = HISTO_LENGTH/360.f;
 
     vector<int> vMatchedDistance(F2.mvKeysUn.size(), INT_MAX);
     vector<int> vnMatches21(F2.mvKeysUn.size(), -1);
@@ -789,7 +791,8 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF1, KeyFrame* pKF2, vector<MapPoint*>& v
     for (int i = 0; i < HISTO_LENGTH; i++)
         rotHist[i].reserve(500);
 
-    const float factor = 1.0f / HISTO_LENGTH;
+    // const float factor = 1.0f/HISTO_LENGTH;  // BUG
+    const float factor = HISTO_LENGTH/360.f;
 
     int nmatches = 0;
 
@@ -951,7 +954,8 @@ int ORBmatcher::SearchForTriangulation(KeyFrame* pKF1, KeyFrame* pKF2, cv::Mat F
     for (int i = 0; i < HISTO_LENGTH; i++)
         rotHist[i].reserve(500);
 
-    const float factor = 1.0f / HISTO_LENGTH;
+    // const float factor = 1.0f/HISTO_LENGTH;  // BUG
+    const float factor = HISTO_LENGTH/360.f;
 
     DBoW2::FeatureVector::const_iterator f1it = vFeatVec1.begin();
     DBoW2::FeatureVector::const_iterator f2it = vFeatVec2.begin();
@@ -1158,7 +1162,8 @@ int ORBmatcher::SearchForTriangulation(KeyFrame* pKF1, KeyFrame* pKF2, cv::Mat F
     for (int i = 0; i < HISTO_LENGTH; i++)
         rotHist[i].reserve(500);
 
-    const float factor = 1.0f / HISTO_LENGTH;
+    // const float factor = 1.0f/HISTO_LENGTH;  // BUG
+    const float factor = HISTO_LENGTH/360.f;
 
     DBoW2::FeatureVector::const_iterator f1it = vFeatVec1.begin();
     DBoW2::FeatureVector::const_iterator f2it = vFeatVec2.begin();
@@ -1834,7 +1839,8 @@ int ORBmatcher::SearchByProjection(Frame& CurrentFrame, const Frame& LastFrame, 
     vector<int> rotHist[HISTO_LENGTH];
     for (int i = 0; i < HISTO_LENGTH; i++)
         rotHist[i].reserve(500);
-    const float factor = 1.0f / HISTO_LENGTH;
+    // const float factor = 1.0f/HISTO_LENGTH;  // BUG
+    const float factor = HISTO_LENGTH/360.f;
 
     const cv::Mat Rcw = CurrentFrame.mTcw.rowRange(0, 3).colRange(0, 3);
     const cv::Mat tcw = CurrentFrame.mTcw.rowRange(0, 3).col(3);
@@ -2053,7 +2059,8 @@ int ORBmatcher::SearchByProjection(Frame& CurrentFrame, KeyFrame* pKF,
     vector<int> rotHist[HISTO_LENGTH];
     for (int i = 0; i < HISTO_LENGTH; i++)
         rotHist[i].reserve(500);
-    const float factor = 1.0f / HISTO_LENGTH;
+    // const float factor = 1.0f/HISTO_LENGTH;  // BUG
+    const float factor = HISTO_LENGTH/360.f;
 
     const vector<MapPoint*> vpMPs = pKF->GetMapPointMatches();
 

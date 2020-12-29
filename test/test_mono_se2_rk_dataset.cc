@@ -55,7 +55,7 @@ int main(int argc, char** argv)
     int tot_images = 0;
     for (seq = 0; seq < num_seq; seq++) {
         cout << "Loading images for sequence " << seq << "...";
-        //        LoadImages(string(argv[3]) + "/image/", 3108, vstrImageFilenames[seq], vTimestampsCam[seq]);
+        // LoadImages(string(argv[3]) + "/image/", 3108, vstrImageFilenames[seq], vTimestampsCam[seq]);
         readImagesRK(string(argv[3]) + "/slamimg/", 1969, vstrImageFilenames[seq],
                      vTimestampsCam[seq]);
         cout << "LOADED!" << endl;
@@ -102,7 +102,7 @@ int main(int argc, char** argv)
 
             // Pass the image to the SLAM system
             // cout << "tframe = " << tframe << endl;
-            SLAM.TrackMonocular(im, tframe);  // TODO change to monocular_inertial
+            SLAM.TrackMonocular(im, tframe);
 
 #ifdef COMPILEDWITHC11
             std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
