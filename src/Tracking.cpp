@@ -1444,7 +1444,8 @@ void Tracking::Track()
                 }
             }
 
-            return;
+            // mLastFrame = Frame(mCurrentFrame);
+            // return;
         }
     }
 
@@ -1734,10 +1735,9 @@ void Tracking::Track()
                 bOK = TrackLocalMap();
         }
 
-        if(bOK)
+        if(bOK) {
             mState = OK;
-        else if (mState == OK)
-        {
+        } else if (mState == OK) {
             if (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO)
             {
                 Verbose::PrintMess("Track lost for less than one second...", Verbose::VERBOSITY_NORMAL);
@@ -2014,42 +2014,38 @@ void Tracking::StereoInitialization()
 
 void Tracking::MonocularInitialization()
 {
-
+    const int initKPTh = 50; // org 100
     if(!mpInitializer)
     {
         // Set Reference Frame
-        if(mCurrentFrame.mvKeys.size()>100)
-        {
+        if (mCurrentFrame.mvKeys.size() > initKPTh) {
 
             mInitialFrame = Frame(mCurrentFrame);
             mLastFrame = Frame(mCurrentFrame);
             mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());
-            for(size_t i=0; i<mCurrentFrame.mvKeysUn.size(); i++)
-                mvbPrevMatched[i]=mCurrentFrame.mvKeysUn[i].pt;
+            for (size_t i = 0; i < mCurrentFrame.mvKeysUn.size(); i++)
+                mvbPrevMatched[i] = mCurrentFrame.mvKeysUn[i].pt;
 
-            if(mpInitializer)
+            if (mpInitializer)
                 delete mpInitializer;
 
-            mpInitializer =  new Initializer(mCurrentFrame,1.0,200);
+            mpInitializer = new Initializer(mCurrentFrame, 1.0, 200);
 
-            fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
+            fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
 
-            if (mSensor == System::IMU_MONOCULAR)
-            {
-                if(mpImuPreintegratedFromLastKF)
-                {
+            if (mSensor == System::IMU_MONOCULAR) {
+                if (mpImuPreintegratedFromLastKF) {
                     delete mpImuPreintegratedFromLastKF;
                 }
-                mpImuPreintegratedFromLastKF = new IMU::Preintegrated(IMU::Bias(),*mpImuCalib);
+                mpImuPreintegratedFromLastKF = new IMU::Preintegrated(IMU::Bias(), *mpImuCalib);
                 mCurrentFrame.mpImuPreintegrated = mpImuPreintegratedFromLastKF;
-
             }
             return;
         }
     }
     else
     {
-        if (((int)mCurrentFrame.mvKeys.size()<=100)||((mSensor == System::IMU_MONOCULAR)&&(mLastFrame.mTimeStamp-mInitialFrame.mTimeStamp>1.0)))
+        if (((int)mCurrentFrame.mvKeys.size()<=initKPTh)||((mSensor == System::IMU_MONOCULAR)&&(mLastFrame.mTimeStamp-mInitialFrame.mTimeStamp>1.0)))
         {
             delete mpInitializer;
             mpInitializer = static_cast<Initializer*>(NULL);
@@ -2059,11 +2055,11 @@ void Tracking::MonocularInitialization()
         }
 
         // Find correspondences
-        ORBmatcher matcher(0.9,true);
+        ORBmatcher matcher(0.7,true);   // org 0.9
         int nmatches = matcher.SearchForInitialization(mInitialFrame,mCurrentFrame,mvbPrevMatched,mvIniMatches,100);
 
         // Check if there are enough correspondences
-        if(nmatches<100)
+        if(nmatches<initKPTh)
         {
             delete mpInitializer;
             mpInitializer = static_cast<Initializer*>(NULL);
@@ -2075,22 +2071,21 @@ void Tracking::MonocularInitialization()
         cv::Mat tcw; // Current Camera Translation
         vector<bool> vbTriangulated; // Triangulated Correspondences (mvIniMatches)
 
-        if(mpCamera->ReconstructWithTwoViews(mInitialFrame.mvKeysUn,mCurrentFrame.mvKeysUn,mvIniMatches,Rcw,tcw,mvIniP3D,vbTriangulated))
-        {
-            for(size_t i=0, iend=mvIniMatches.size(); i<iend;i++)
-            {
-                if(mvIniMatches[i]>=0 && !vbTriangulated[i])
-                {
-                    mvIniMatches[i]=-1;
+        bool ok = mpCamera->ReconstructWithTwoViews(mInitialFrame.mvKeysUn, mCurrentFrame.mvKeysUn, mvIniMatches, Rcw,
+                                                    tcw, mvIniP3D, vbTriangulated);
+        if (ok) {
+            for (size_t i = 0, iend = mvIniMatches.size(); i < iend; i++) {
+                if (mvIniMatches[i] >= 0 && !vbTriangulated[i]) {
+                    mvIniMatches[i] = -1;
                     nmatches--;
                 }
             }
 
             // Set Frame Poses
-            mInitialFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
-            cv::Mat Tcw = cv::Mat::eye(4,4,CV_32F);
-            Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
-            tcw.copyTo(Tcw.rowRange(0,3).col(3));
+            mInitialFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
+            cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
+            Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
+            tcw.copyTo(Tcw.rowRange(0, 3).col(3));
             mCurrentFrame.SetPose(Tcw);
 
             CreateInitialMapMonocular();
