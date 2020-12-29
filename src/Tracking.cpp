@@ -2162,10 +2162,11 @@ void Tracking::CreateInitialMapMonocular()
 
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
     float invMedianDepth;
-    if(mSensor == System::IMU_MONOCULAR)
-        invMedianDepth = 4.0f/medianDepth; // 4.0f
-    else
-        invMedianDepth = 1.0f/medianDepth;
+    if (mSensor == System::IMU_MONOCULAR) {
+        invMedianDepth = 4.0f / medianDepth;  // 4.0f
+    } else {
+        invMedianDepth = 1.0f / medianDepth;
+    }
 
     if(medianDepth<0 || pKFcur->TrackedMapPoints(1)<50) // TODO Check, originally 100 tracks
     {

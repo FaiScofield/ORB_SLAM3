@@ -71,6 +71,14 @@ public:
     std::vector<cv::Mat> mvImagePyramid;
     std::vector<cv::Mat> mvMaskPyramid;
 
+    /**
+     * In order to adapt the scenarios with bad light condition,
+     * add new feature type here for this system to extract other type features
+     */
+    enum FeatureType_e {ORB = 0, GFTT = 1, SURF = 2} mFeatureType;
+    void SetFeatureType(int var) { mFeatureType = static_cast<FeatureType_e>(var); }
+    int GetFeatureType() const { return static_cast<int>(mFeatureType); }
+
 protected:
     void ComputePyramid(cv::InputArray image, cv::InputArray mask);
     void ComputeKeyPointsOctTree(std::vector<std::vector<cv::KeyPoint>>& allKeypoints);
@@ -79,6 +87,8 @@ protected:
                                                 const int& maxY, const int& nFeatures, const int& level);
 
     void ComputeKeyPointsOld(std::vector<std::vector<cv::KeyPoint>>& allKeypoints);
+    void ComputeKeyPointsGFTT(std::vector<std::vector<cv::KeyPoint>>& allKeypoints);
+    void ComputeKeyPointsSURF(std::vector<std::vector<cv::KeyPoint>>& allKeypoints);
     std::vector<cv::Point> pattern;
 
     bool bWithMask;

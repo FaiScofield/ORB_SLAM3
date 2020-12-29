@@ -57,6 +57,7 @@
 #include <iostream>
 #include <opencv2/core/core.hpp>
 #include <opencv2/features2d/features2d.hpp>
+#include <opencv2/xfeatures2d/nonfree.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <vector>
@@ -67,6 +68,7 @@ using namespace std;
 
 #define ENABLE_DEBUG_INTERMEDIATE_DATA 0
 #define DEBUG_OUTPUT_FOLDER "/home/vance/output/orb/"
+
 namespace ORB_SLAM3 {
 
 const int PATCH_SIZE = 31;
@@ -1135,17 +1137,30 @@ int ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoin
     ComputePyramid(_image, _mask);
 
     vector<vector<KeyPoint>> allKeypoints;
-    ComputeKeyPointsOctTree(allKeypoints);
-    // ComputeKeyPointsOld(allKeypoints);
+
+    // compute KP accordding to mFeatureType
+    switch (mFeatureType)
+    {
+    case GFTT:
+        ComputeKeyPointsGFTT(allKeypoints);
+        break;
+    case SURF:
+        ComputeKeyPointsSURF(allKeypoints);
+        break;
+    case ORB:
+    default:
+        ComputeKeyPointsOctTree(allKeypoints);
+        break;
+    }
 
     Mat descriptors;
 
     int nkeypoints = 0;
     for (int level = 0; level < nlevels; ++level)
         nkeypoints += (int)allKeypoints[level].size();
-    if (nkeypoints == 0)
+    if (nkeypoints == 0) {
         _descriptors.release();
-    else {
+    } else {
         _descriptors.create(nkeypoints, 32, CV_8U);
         descriptors = _descriptors.getMat();
     }
@@ -1244,6 +1259,135 @@ void ORBextractor::ComputePyramid(cv::InputArray _image, cv::InputArray _mask)
         snprintf(imgFile, 64, "%s/maskPyr_level_%d.jpg", DEBUG_OUTPUT_FOLDER, level);
         imwrite(imgFile, mvMaskPyramid[level]);
 #endif
+    }
+}
+
+
+void ORBextractor::ComputeKeyPointsGFTT(vector<vector<KeyPoint>>& allKeypoints)
+{
+    allKeypoints.resize(nlevels);
+
+    for (int level = 0; level < nlevels; ++level) {
+        const int minBorderX = EDGE_THRESHOLD-3;
+        const int minBorderY = minBorderX;
+        const int maxBorderX = mvImagePyramid[level].cols-EDGE_THRESHOLD+3;
+        const int maxBorderY = mvImagePyramid[level].rows-EDGE_THRESHOLD+3;
+
+        vector<Point2f> vPoints;
+        goodFeaturesToTrack(mvImagePyramid[level], vPoints, mnFeaturesPerLevel[level], 0.005, 10/(level+1));
+
+        vector<cv::KeyPoint> vToDistributeKeys;
+        vToDistributeKeys.reserve(vPoints.size());
+
+        for (auto iter = vPoints.begin(); iter != vPoints.end(); ++iter) {
+            if (iter->x >= minBorderX && iter->x < maxBorderX && 
+                iter->y >= minBorderY && iter->y < maxBorderY) {
+                    vToDistributeKeys.emplace_back(iter->x - minBorderX, iter->y - minBorderY, 1, -1.f, 0.f, level);
+                }
+        }
+
+        if (bWithMask) {
+            const size_t n = vToDistributeKeys.size();
+            vector<cv::KeyPoint> vFeatureOnMask;
+            vFeatureOnMask.reserve(n);
+
+            for (auto vit = vToDistributeKeys.begin(); vit != vToDistributeKeys.end(); vit++) {
+                Point2f posi = (*vit).pt;
+                posi.x += minBorderX;
+                posi.y += minBorderY;
+                if (mvMaskPyramid[level].at<uchar>(posi) > 0)
+                    vFeatureOnMask.push_back(*vit);
+            }
+            vFeatureOnMask.swap(vToDistributeKeys);
+        }
+
+        vector<KeyPoint> & keypoints = allKeypoints[level];
+        keypoints.reserve(vToDistributeKeys.size());
+
+        keypoints = DistributeOctTree(vToDistributeKeys, minBorderX, maxBorderX,
+                                      minBorderY, maxBorderY, mnFeaturesPerLevel[level], level);
+
+
+        // Add border to coordinates and scale information
+        const int scaledPatchSize = PATCH_SIZE * mvScaleFactor[level];
+        const int nkps = keypoints.size();
+        for(int i=0; i<nkps ; i++)
+        {
+            keypoints[i].pt.x += minBorderX;
+            keypoints[i].pt.y += minBorderY;
+            keypoints[i].octave = level;
+            keypoints[i].size = scaledPatchSize;
+        }
+    }
+
+    // compute orientations
+    for (int level = 0; level < nlevels; ++level) {
+        computeOrientation(mvImagePyramid[level], allKeypoints[level], umax);
+    }
+}
+
+void ORBextractor::ComputeKeyPointsSURF(vector<vector<KeyPoint>>& allKeypoints)
+{
+    allKeypoints.resize(nlevels);
+
+    for (int level = 0; level < nlevels; ++level) {
+        const int minBorderX = EDGE_THRESHOLD-3;
+        const int minBorderY = minBorderX;
+        const int maxBorderX = mvImagePyramid[level].cols-EDGE_THRESHOLD+3;
+        const int maxBorderY = mvImagePyramid[level].rows-EDGE_THRESHOLD+3;
+
+        vector<KeyPoint> vPoints;
+        Ptr<xfeatures2d::SURF> pSURFDetector = xfeatures2d::SURF::create(300, 1, 1, false, true);
+        pSURFDetector->detect(mvImagePyramid[level], vPoints);
+        // printf("get %ld KPs in level %d.\n", vPoints.size(), level);
+
+        vector<cv::KeyPoint> vToDistributeKeys;
+        vToDistributeKeys.reserve(vPoints.size());
+
+        for (auto iter = vPoints.begin(); iter != vPoints.end(); ++iter) {
+            Point2f& kp = iter->pt;
+            if (kp.x >= minBorderX && kp.x < maxBorderX && 
+                kp.y >= minBorderY && kp.y < maxBorderY) {
+                    vToDistributeKeys.emplace_back(kp.x - minBorderX, kp.y - minBorderY, 1, -1.f, 0.f, level);
+                }
+        }
+
+        if (bWithMask) {
+            const size_t n = vToDistributeKeys.size();
+            vector<cv::KeyPoint> vFeatureOnMask;
+            vFeatureOnMask.reserve(n);
+
+            for (auto vit = vToDistributeKeys.begin(); vit != vToDistributeKeys.end(); vit++) {
+                Point2f posi = (*vit).pt;
+                posi.x += minBorderX;
+                posi.y += minBorderY;
+                if (mvMaskPyramid[level].at<uchar>(posi) > 0)
+                    vFeatureOnMask.push_back(*vit);
+            }
+            vFeatureOnMask.swap(vToDistributeKeys);
+        }
+        
+        vector<KeyPoint> & keypoints = allKeypoints[level];
+        keypoints.reserve(vToDistributeKeys.size());
+
+        keypoints = DistributeOctTree(vToDistributeKeys, minBorderX, maxBorderX,
+                                      minBorderY, maxBorderY, mnFeaturesPerLevel[level], level);
+
+        // Add border to coordinates and scale information
+        const int scaledPatchSize = PATCH_SIZE * mvScaleFactor[level];
+        const int nkps = keypoints.size();
+        for(int i=0; i<nkps ; i++)
+        {
+            keypoints[i].pt.x += minBorderX;
+            keypoints[i].pt.y += minBorderY;
+            keypoints[i].octave = level;
+            keypoints[i].size = scaledPatchSize;
+        }
+    }
+
+    // compute orientations
+    for (int level = 0; level < nlevels; ++level) {
+        computeOrientation(mvImagePyramid[level], allKeypoints[level], umax);
     }
 }
 
