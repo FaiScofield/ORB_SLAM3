@@ -7,6 +7,8 @@
 #include <opencv2/core/core.hpp>
 #include <boost/filesystem.hpp>
 
+#define ENABLE_EQUALIZE_HISTOGRAM   0
+
 using namespace std;
 namespace bf = boost::filesystem;
 
@@ -95,8 +97,10 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        // pClaher->apply(im, imCa);
-        // im = imCa;
+#if ENABLE_EQUALIZE_HISTOGRAM
+        pClaher->apply(im, imCa);
+        im = imCa;
+#endif
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();

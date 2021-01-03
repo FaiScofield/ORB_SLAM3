@@ -10,11 +10,12 @@ MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -O3")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -O3 -Wno-deprecated-declarations -Wno-unused-variable")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations -Wno-unused-variable")
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -Wno-deprecated-declarations")
 
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-deprecated -O3 -march=native ")
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-deprecated -O3 -march=native")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS} -O0 -Wall -ggdb")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -Wall -ggdb")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=native")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")
+
 
 # Check C++11 or C++0x support
 include(CheckCXXCompilerFlag)
@@ -86,6 +87,7 @@ add_library(${PROJECT_NAME} SHARED
     src/Initializer.cpp
     src/Viewer.cpp
     src/ImuTypes.cpp
+    src/OdomTypes.cpp
     src/G2oTypes.cpp
     src/CameraModels/Pinhole.cpp
     src/CameraModels/KannalaBrandt8.cpp
@@ -113,6 +115,7 @@ add_library(${PROJECT_NAME} SHARED
     include/Initializer.h
     include/Viewer.h
     include/ImuTypes.h
+    include/OdomTypes.h
     include/G2oTypes.h
     include/CameraModels/GeometricCamera.h
     include/CameraModels/Pinhole.h

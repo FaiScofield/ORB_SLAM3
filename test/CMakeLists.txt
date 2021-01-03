@@ -24,3 +24,6 @@ target_link_libraries(test_kltTracking ${PROJECT_NAME} ${Boost_LIBRARIES})
 
 add_executable(test_mono_fzu_dataset test_mono_fzu_dataset.cpp)
 target_link_libraries(test_mono_fzu_dataset ${PROJECT_NAME} ${Boost_LIBRARIES})
+
+add_executable(match_odometry match_odometry.cpp)
+target_link_libraries(match_odometry ${Boost_LIBRARIES} ${EIGEN3_LIBS})
