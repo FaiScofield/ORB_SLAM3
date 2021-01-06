@@ -117,12 +117,12 @@ bool TwoViewReconstruction::Reconstruct(const std::vector<cv::KeyPoint>& vKeys1,
     if(RH>0.50) // if(RH>0.40)
     {
         //cout << "Initialization from Homography" << endl;
-        return ReconstructH(vbMatchesInliersH,H, mK,R21,t21,vP3D,vbTriangulated,minParallax,50);
+        return ReconstructH(vbMatchesInliersH,H, mK,R21,t21,vP3D,vbTriangulated,minParallax,30);    // org 50
     }
     else //if(pF_HF>0.6)
     {
         //cout << "Initialization from Fundamental" << endl;
-        return ReconstructF(vbMatchesInliersF,F,mK,R21,t21,vP3D,vbTriangulated,minParallax,50);
+        return ReconstructF(vbMatchesInliersF,F,mK,R21,t21,vP3D,vbTriangulated,minParallax,30);     // org 50
     }
 }
 
@@ -506,16 +506,17 @@ bool TwoViewReconstruction::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat
     R21 = cv::Mat();
     t21 = cv::Mat();
 
-    int nMinGood = max(static_cast<int>(0.9*N),minTriangulated);
+    int nMinGood = max(static_cast<int>(0.8*N),minTriangulated);    // org 0.9
 
+    float ratio = 0.6;  // org 0.7
     int nsimilar = 0;
-    if(nGood1>0.7*maxGood)
+    if (nGood1 > ratio * maxGood)
         nsimilar++;
-    if(nGood2>0.7*maxGood)
+    if (nGood2 > ratio * maxGood)
         nsimilar++;
-    if(nGood3>0.7*maxGood)
+    if (nGood3 > ratio * maxGood)
         nsimilar++;
-    if(nGood4>0.7*maxGood)
+    if (nGood4 > ratio * maxGood)
         nsimilar++;
 
     // If there is not a clear winner or not enough triangulated points reject initialization
@@ -722,7 +723,7 @@ bool TwoViewReconstruction::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat
     }
 
 
-    if(secondBestGood<0.75*bestGood && bestParallax>=minParallax && bestGood>minTriangulated && bestGood>0.9*N)
+    if(secondBestGood<0.70*bestGood && bestParallax>=minParallax && bestGood>minTriangulated && bestGood>0.8*N) // org 0.75, 0.9
     {
         vR[bestSolutionIdx].copyTo(R21);
         vt[bestSolutionIdx].copyTo(t21);

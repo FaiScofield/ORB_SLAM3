@@ -20,23 +20,25 @@
 #ifndef TRACKING_H
 #define TRACKING_H
 
-#include<opencv2/core/core.hpp>
-#include<opencv2/features2d/features2d.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/features2d/features2d.hpp>
 #include <opencv2/video/tracking.hpp>
 
-#include"Viewer.h"
-#include"FrameDrawer.h"
-#include"Atlas.h"
-#include"LocalMapping.h"
-#include"LoopClosing.h"
-#include"Frame.h"
-#include "ORBVocabulary.h"
-#include"KeyFrameDatabase.h"
-#include"ORBextractor.h"
-#include "Initializer.h"
-#include "MapDrawer.h"
-#include "System.h"
+#include "Atlas.h"
+#include "Frame.h"
+#include "FrameDrawer.h"
 #include "ImuTypes.h"
+#include "OdomTypes.h"
+#include "Initializer.h"
+#include "KeyFrameDatabase.h"
+#include "LocalMapping.h"
+#include "LoopClosing.h"
+#include "MapDrawer.h"
+#include "Odometry.h"
+#include "ORBVocabulary.h"
+#include "ORBextractor.h"
+#include "System.h"
+#include "Viewer.h"
 
 #include "GeometricCamera.h"
 
@@ -54,7 +56,7 @@ class LoopClosing;
 class System;
 
 class Tracking
-{  
+{
 
 public:
     Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Atlas* pAtlas,
@@ -66,6 +68,7 @@ public:
     bool ParseCamParamFile(cv::FileStorage &fSettings);
     bool ParseORBParamFile(cv::FileStorage &fSettings);
     bool ParseIMUParamFile(cv::FileStorage &fSettings);
+    bool ParseOdomParamFile(cv::FileStorage &fSettings);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp, string filename);
@@ -74,6 +77,7 @@ public:
     // cv::Mat GrabImageImuMonocular(const cv::Mat &im, const double &timestamp);
 
     void GrabImuData(const IMU::Point &imuMeasurement);
+    void GrabOdomData(const ODOM::Point &odomMeasurement);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
@@ -88,6 +92,7 @@ public:
     void InformOnlyTracking(const bool &flag);
 
     void UpdateFrameIMU(const float s, const IMU::Bias &b, KeyFrame* pCurrentKeyFrame);
+    void UpdateFrameODOM(const float s, KeyFrame* pCurrentKeyFrame);
     KeyFrame* GetLastKeyFrame()
     {
         return mpLastKeyFrame;
@@ -103,14 +108,15 @@ public:
 public:
 
     // Tracking states
-    enum eTrackingState{
-        SYSTEM_NOT_READY=-1,
-        NO_IMAGES_YET=0,
-        NOT_INITIALIZED=1,
-        OK=2,
-        RECENTLY_LOST=3,
-        LOST=4,
-        OK_KLT=5
+    enum eTrackingState
+    {
+        SYSTEM_NOT_READY = -1,
+        NO_IMAGES_YET = 0,
+        NOT_INITIALIZED = 1,
+        OK = 2,
+        RECENTLY_LOST = 3,
+        LOST = 4,
+        OK_KLT = 5
     };
 
     eTrackingState mState;
@@ -154,7 +160,9 @@ public:
     double t0; // time-stamp of first read frame
     double t0vis; // time-stamp of first inserted keyframe
     double t0IMU; // time-stamp of IMU initialization
+    double t0ODOM; // time-stamp of ODOM initialization
 
+    int mnInitFailedCnt;
 
     vector<MapPoint*> GetLocalMapMPS();
 
@@ -176,6 +184,7 @@ protected:
 
     // Map initialization for monocular
     void MonocularInitialization();
+    void MonocularInitializationWithOdometry();
     void CreateNewMapPoints();
     cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2);
     void CreateInitialMapMonocular();
@@ -185,6 +194,8 @@ protected:
     void UpdateLastFrame();
     bool TrackWithMotionModel();
     bool PredictStateIMU();
+
+    bool TrackWithOdometry();
 
     bool Relocalization();
 
@@ -201,9 +212,11 @@ protected:
 
     // Perform preintegration from last frame
     void PreintegrateIMU();
+    void PreintegrateODOM();
 
     // Reset IMU biases and compute frame velocity
     void ResetFrameIMU();
+    void ResetFrameODOM();
     void ComputeGyroBias(const vector<Frame*> &vpFs, float &bwx,  float &bwy, float &bwz);
     void ComputeVelocitiesAccBias(const vector<Frame*> &vpFs, float &bax,  float &bay, float &baz);
 
@@ -212,16 +225,21 @@ protected:
 
     // Imu preintegration from last frame
     IMU::Preintegrated *mpImuPreintegratedFromLastKF;
+    // ODOM::Preintegrated *mpOdomPreintegratedFromLastKF;
 
-    // Queue of IMU measurements between frames
+    // Queue of IMU measurements **BETWEEN FRAMES**!
     std::list<IMU::Point> mlQueueImuData;
+    std::list<ODOM::Point> mlQueueOdomData;
 
     // Vector of IMU measurements from previous to current frame (to be filled by PreintegrateIMU)
     std::vector<IMU::Point> mvImuFromLastFrame;
+    // std::vector<ODOM::Point> mvOdomFromLastFrame;
     std::mutex mMutexImuQueue;
+    std::mutex mMutexOdomQueue;
 
     // Imu calibration parameters
     IMU::Calib *mpImuCalib;
+    ODOM::Calib *mpOdomCalib;
 
     // Last Bias Estimation (at keyframe creation)
     IMU::Bias mLastBias;
@@ -276,6 +294,8 @@ protected:
 
     int mnFirstImuFrameId;
     int mnFramesToResetIMU;
+    int mnFirstOdomFrameId;
+    int mnFramesToResetOdom;
 
     // Threshold close/far points
     // Points seen as close by the stereo/RGBD sensor are considered reliable
@@ -318,6 +338,7 @@ protected:
 
     ofstream f_track_times;
     double mTime_PreIntIMU;
+    double mTime_PreIntOdom;
     double mTime_PosePred;
     double mTime_LocalMapTrack;
     double mTime_NewKF_Dec;

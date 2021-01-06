@@ -69,7 +69,9 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         cout << "Monocular-Inertial" << endl;
     else if(mSensor==IMU_STEREO)
         cout << "Stereo-Inertial" << endl;
-
+    else if(mSensor==ODOM_MONOCULAR)
+        cout << "Monocular-Odometry" << endl;
+		
     //Check settings file
     cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
     if(!fsSettings.isOpened())
@@ -189,8 +191,8 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
                              mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, strSequence);
 
     //Initialize the Local Mapping thread and launch
-    mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR, mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO, strSequence);
-    mptLocalMapping = new thread(&ORB_SLAM3::LocalMapping::Run,mpLocalMapper);
+    mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR || mSensor==ODOM_MONOCULAR, mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO, strSequence);
+    mptLocalMapping = new thread(&ORB_SLAM3::LocalMapping::Run, mpLocalMapper);
     mpLocalMapper->mInitFr = initFr;
     mpLocalMapper->mThFarPoints = fsSettings["thFarPoints"];
     if(mpLocalMapper->mThFarPoints!=0)
@@ -418,7 +420,61 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp, const
     return Tcw;
 }
 
+cv::Mat System::TrackMonocularWithOdom(const cv::Mat& im, const double& timestamp, const vector<ODOM::Point>& vOdomMeas, string filename)
+{
+    if (mSensor != ODOM_MONOCULAR) {
+        cerr << "ERROR: you called TrackMonocularWithOdom but input sensor was not set to Monocular-Odometry." << endl;
+        exit(-1);
+    }
 
+    // Check mode change
+    {
+        unique_lock<mutex> lock(mMutexMode);
+        if (mbActivateLocalizationMode) {
+            mpLocalMapper->RequestStop();
+
+            // Wait until Local Mapping has effectively stopped
+            while (!mpLocalMapper->isStopped()) {
+                usleep(1000);
+            }
+
+            mpTracker->InformOnlyTracking(true);
+            mbActivateLocalizationMode = false;
+        }
+        if (mbDeactivateLocalizationMode) {
+            mpTracker->InformOnlyTracking(false);
+            mpLocalMapper->Release();
+            mbDeactivateLocalizationMode = false;
+        }
+    }
+
+    // Check reset
+    {
+        unique_lock<mutex> lock(mMutexReset);
+        if (mbReset) {
+            mpTracker->Reset();
+            mbReset = false;
+            mbResetActiveMap = false;
+        } else if (mbResetActiveMap) {
+            cout << "SYSTEM-> Reseting active map in monocular case" << endl;
+            mpTracker->ResetActiveMap();
+            mbResetActiveMap = false;
+        }
+    }
+
+
+    for (size_t j = 0; j < vOdomMeas.size(); j++)
+        mpTracker->GrabOdomData(vOdomMeas[j]);
+
+    cv::Mat Tcw = mpTracker->GrabImageMonocular(im, timestamp, filename);
+
+    unique_lock<mutex> lock2(mMutexState);
+    mTrackingState = mpTracker->mState;
+    mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
+    mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+
+    return Tcw;
+}
 
 void System::ActivateLocalizationMode()
 {
@@ -594,7 +650,7 @@ void System::SaveTrajectoryEuRoC(const string &filename)
 
     vector<Map*> vpMaps = mpAtlas->GetAllMaps();
     Map* pBiggerMap;
-    int numMaxKFs = 0;
+    size_t numMaxKFs = 0;
     for(Map* pMap :vpMaps)
     {
         if(pMap->GetAllKeyFrames().size() > numMaxKFs)
@@ -711,7 +767,7 @@ void System::SaveKeyFrameTrajectoryEuRoC(const string &filename)
 
     vector<Map*> vpMaps = mpAtlas->GetAllMaps();
     Map* pBiggerMap;
-    int numMaxKFs = 0;
+    size_t numMaxKFs = 0;
     for(Map* pMap :vpMaps)
     {
         if(pMap->GetAllKeyFrames().size() > numMaxKFs)

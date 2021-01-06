@@ -18,8 +18,8 @@ int main(int argc, char** argv)
 {
     const string vocabularyFile = "/home/vance/slam_ws/PL-SLAM-Mono/Vocabulary/ORBvoc.bin";
     const string settingFile = "/home/vance/dataset/fzu/ORB-SLAM3-Config.yaml";
-    const string sequenceFolder = "/home/vance/dataset/fzu/201223_indoor/image/";
-    const string odomRawFile = "/home/vance/dataset/fzu/201223_indoor/odom.txt";    // TODO
+    const string sequenceFolder = "/home/vance/dataset/fzu/201224_hall_1/image/";
+    const string odomRawFile = "/home/vance/dataset/fzu/201224_hall_1/odom_sync.txt";
 
     // Retrieve paths to images
     vector<string> vstrImageFilenames;
@@ -40,34 +40,32 @@ int main(int argc, char** argv)
         cerr << "[Main ][Error] Please check if the file exists!" << odomRawFile << endl;
     }
 
-#if 0
-    vector<ORB_SLAM2::Odom> vOdometries;
+#if 1
+    vector<ORB_SLAM3::ODOM::Point> vOdometries;
     int nOdoms = 0;
     if (bWithOdom) {
         vOdometries.reserve(nImages);
         float x, y, theta;
-        long timestamp;
+        double timestamp;
         string line;
         while (std::getline(rec, line), !line.empty()) {
             istringstream iss(line);
-            iss >> x >> y >> theta; // [mm],[rad]
-            vOdometries.emplace_back(x * 0.001f, y * 0.001f, theta);
+            iss >> timestamp >> x >> y >> theta; // [m],[rad]
+            vOdometries.emplace_back(x, y, theta, timestamp);
+            line.clear();
         }
         nOdoms = static_cast<int>(vOdometries.size());
     
         if (nOdoms < 1 || nOdoms != nImages) {
-            cerr << "ERROR: Failed to load odometries!" << endl;
+            cerr << "ERROR: Failed to load odometries! nOdoms = " << nOdoms << endl;
             bWithOdom = false;
         }
     }
 #endif
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM3::System SLAM(vocabularyFile, settingFile, ORB_SLAM3::System::MONOCULAR, true);
-    // if (bWithOdom) {
-    //     SLAM.SetSensor2(ORB_SLAM2::System::ODOMETRY);   // use odometry data
-    //     cout << "Set sensor2 to ODOMETRY!" << endl;
-    // }
+    auto sensorType = bWithOdom ? ORB_SLAM3::System::ODOM_MONOCULAR : ORB_SLAM3::System::MONOCULAR;
+    ORB_SLAM3::System SLAM(vocabularyFile, settingFile, sensorType, true);
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
@@ -76,21 +74,19 @@ int main(int argc, char** argv)
     cout << endl << "-------" << endl;
     cout << "Start processing sequence ..." << endl;
     cout << "Images in the sequence: " << nImages << endl;
-    // cout << "Odometries in the sequence: " << nOdoms << endl << endl;
+    cout << "Odometries in the sequence: " << nOdoms << endl << endl;
 
     cv::Ptr<cv::CLAHE> pClaher = cv::createCLAHE(3, cv::Size(8, 8));
 
 
     // Main loop
     cv::Mat im, imCa;
-    // ORB_SLAM2::Odom odo;
     for (int ni = 0; ni < nImages; ni++) {
         cout << "========================= " << ni << " =========================" << endl;
 
         // Read image from file
         im = cv::imread(vstrImageFilenames[ni], CV_LOAD_IMAGE_GRAYSCALE);
         double tframe = vTimestamps[ni];    // [s]
-        // odo = bWithOdom ? vOdometries[ni] : odo;
 
         if (im.empty()) {
             cerr << endl << "Failed to load image at: " << vstrImageFilenames[ni] << endl;
@@ -109,8 +105,13 @@ int main(int argc, char** argv)
 #endif
 
         // Pass the image to the SLAM system
-        // SLAM.TrackMonocular(im, tframe, odo);
-        SLAM.TrackMonocular(im, tframe);
+        if (bWithOdom) {
+            vector<ORB_SLAM3::ODOM::Point> vOdomsThisFrame;
+            vOdomsThisFrame.push_back(vOdometries[ni]);
+            SLAM.TrackMonocularWithOdom(im, tframe, vOdomsThisFrame);
+        } else {
+            SLAM.TrackMonocular(im, tframe);
+        }
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();

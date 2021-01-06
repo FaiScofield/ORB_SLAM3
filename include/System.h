@@ -22,12 +22,12 @@
 
 //#define SAVE_TIMES
 
+#include <opencv2/core/core.hpp>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
+#include <thread>
 #include <unistd.h>
-#include<stdio.h>
-#include<stdlib.h>
-#include<string>
-#include<thread>
-#include<opencv2/core/core.hpp>
 
 #include "Tracking.h"
 #include "FrameDrawer.h"
@@ -39,6 +39,7 @@
 #include "ORBVocabulary.h"
 #include "Viewer.h"
 #include "ImuTypes.h"
+#include "OdomTypes.h"
 
 
 namespace ORB_SLAM3
@@ -87,14 +88,18 @@ public:
         STEREO=1,
         RGBD=2,
         IMU_MONOCULAR=3,
-        IMU_STEREO=4
+        IMU_STEREO=4,
+        ODOM_MONOCULAR=5
     };
-
     // File type
     enum eFileType{
         TEXT_FILE=0,
         BINARY_FILE=1,
     };
+
+    // sensor 
+    void SetSensor(int val) { mSensor = (eSensor)val; }
+    int GetSensor() const { return (int)mSensor; }
 
 public:
 
@@ -116,7 +121,7 @@ public:
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
     cv::Mat TrackMonocular(const cv::Mat &im, const double &timestamp, const vector<IMU::Point>& vImuMeas = vector<IMU::Point>(), string filename="");
-
+    cv::Mat TrackMonocularWithOdom(const cv::Mat &im, const double &timestamp, const vector<ODOM::Point>& vOdomMeas = vector<ODOM::Point>(), string filename="");
 
     // This stops local mapping thread (map building) and performs only camera tracking.
     void ActivateLocalizationMode();

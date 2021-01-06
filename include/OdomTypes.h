@@ -17,16 +17,16 @@
 */
 
 
-#ifndef IMUTYPES_H
-#define IMUTYPES_H
+#ifndef ODOM_TYPES_H
+#define ODOM_TYPES_H
 
-#include<vector>
-#include<utility>
-#include<opencv2/core/core.hpp>
 #include <Eigen/Core>
-#include <Eigen/Geometry>
 #include <Eigen/Dense>
+#include <Eigen/Geometry>
 #include <mutex>
+#include <opencv2/core/core.hpp>
+#include <utility>
+#include <vector>
 
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/vector.hpp>
@@ -34,56 +34,47 @@
 namespace ORB_SLAM3
 {
 
-namespace IMU
+namespace ODOM
 {
 
 const float GRAVITY_VALUE=9.81;
 
-//IMU measurement (gyro, accelerometer and timestamp)
+// ODOM measurement (translation, rotation and timestamp)
 class Point
 {
 public:
-    Point(const float &acc_x, const float &acc_y, const float &acc_z,
-             const float &ang_vel_x, const float &ang_vel_y, const float &ang_vel_z,
-             const double &timestamp): a(acc_x,acc_y,acc_z), w(ang_vel_x,ang_vel_y,ang_vel_z), t(timestamp){}
-    Point(const cv::Point3f Acc, const cv::Point3f Gyro, const double &timestamp):
-        a(Acc.x,Acc.y,Acc.z), w(Gyro.x,Gyro.y,Gyro.z), t(timestamp){}
-public:
-    cv::Point3f a;
-    cv::Point3f w;
-    double t;
-};
+    Point() : data(cv::Point3f()), t(0.) {}
+    Point(float v1, float v2, float v3, double timestamp = 0.) : data(v1, v2, v3), t(timestamp) {}
+    Point(const cv::Point3f& val, double timestamp = 0.) : data(val), t(timestamp) {}
 
-//IMU biases (gyro and accelerometer)
-class Bias
-{
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive & ar, const unsigned int version)
+    cv::Mat toCvSE3() const;
+
+    Point operator+(const Point& that) const;
+    Point operator-(const Point& that) const;
+    Point& operator=(const Point& that);
+
+    // Point inverse() const
+    // {
+    //     float c = std::cos(data.z);
+    //     float s = std::sin(data.z);
+    //     return Point(-c * data.x - s * data.y, s * data.x - c * data.y, -data.z, t);
+    // }
+
+    friend std::ostream& operator<<(std::ostream& os, const Point& that)
     {
-        ar & bax;
-        ar & bay;
-        ar & baz;
-
-        ar & bwx;
-        ar & bwy;
-        ar & bwz;
+        os << " [" << that.data.x << ", " << that.data.y << ", " << that.data.z << "]";
+        return os;
     }
 
 public:
-    Bias():bax(0),bay(0),baz(0),bwx(0),bwy(0),bwz(0){}
-    Bias(const float &b_acc_x, const float &b_acc_y, const float &b_acc_z,
-            const float &b_ang_vel_x, const float &b_ang_vel_y, const float &b_ang_vel_z):
-            bax(b_acc_x), bay(b_acc_y), baz(b_acc_z), bwx(b_ang_vel_x), bwy(b_ang_vel_y), bwz(b_ang_vel_z){}
-    void CopyFrom(Bias &b);
-    friend std::ostream& operator<< (std::ostream &out, const Bias &b);
-
-public:
-    float bax, bay, baz;
-    float bwx, bwy, bwz;
+    cv::Point3f data;
+    double t;
 };
 
-//IMU calibration (Tbc, Tcb, noise)
+Point invOdom(const Point& p);
+
+
+// ODOM calibration (Tbc, Tcb, noise)
 class Calib
 {
     template<class Archive>
@@ -119,26 +110,23 @@ class Calib
         serializeMatrix(ar,Tcb,version);
         serializeMatrix(ar,Tbc,version);
         serializeMatrix(ar,Cov,version);
-        serializeMatrix(ar,CovWalk,version);
     }
 
 public:
-    Calib(const cv::Mat &Tbc_, const float &ng, const float &na, const float &ngw, const float &naw)
-    {
-        Set(Tbc_,ng,na,ngw,naw);
-    }
-    Calib(const Calib &calib);
-    Calib(){}
+    Calib(const cv::Mat& Tbc_, float noise) { Set(Tbc_, noise); }
+    Calib(const Calib& calib);
+    Calib() {}
 
-    void Set(const cv::Mat &Tbc_, const float &ng, const float &na, const float &ngw, const float &naw);
+    void Set(const cv::Mat& Tbc_, float noise);
 
 public:
     cv::Mat Tcb;
     cv::Mat Tbc;
-    cv::Mat Cov, CovWalk;
+    cv::Mat Cov;
 };
 
-//Integration of 1 gyro measurement
+#if 0
+// Integration of 1 gyro measurement
 class IntegratedRotation
 {
 public:
@@ -151,7 +139,7 @@ public:
     cv::Mat rightJ; // right jacobian
 };
 
-//Preintegration of Imu Measurements
+// Preintegration of Imu Measurements
 class Preintegrated
 {
     template<class Archive>
@@ -265,6 +253,7 @@ private:
 
     std::mutex mMutex;
 };
+#endif
 
 // Lie Algebra Functions
 cv::Mat ExpSO3(const float &x, const float &y, const float &z);
@@ -282,4 +271,4 @@ cv::Mat NormalizeRotation(const cv::Mat &R);
 
 } //namespace ORB_SLAM3
 
-#endif // IMUTYPES_H
+#endif // ODOM_TYPES_H

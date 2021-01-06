@@ -150,9 +150,9 @@ void LocalMapping::Run()
                     }
                     else
                     {
-                        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+                        // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
                         Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpCurrentKeyFrame->GetMap(),num_FixedKF_BA);
-                        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+                        // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
                     }
                 }
 
@@ -393,7 +393,7 @@ void LocalMapping::CreateNewMapPoints()
     {
         KeyFrame* pKF = mpCurrentKeyFrame;
         int count=0;
-        while((vpNeighKFs.size()<=nn)&&(pKF->mPrevKF)&&(count++<nn))
+        while (((int)vpNeighKFs.size() <= nn) && (pKF->mPrevKF) && (count++ < nn))
         {
             vector<KeyFrame*>::iterator it = std::find(vpNeighKFs.begin(), vpNeighKFs.end(), pKF->mPrevKF);
             if(it==vpNeighKFs.end())
@@ -998,9 +998,9 @@ void LocalMapping::KeyFrameCulling()
                     nMPs++;
                     if(pMP->Observations()>thObs)
                     {
-                        const int &scaleLevel = (pKF -> NLeft == -1) ? pKF->mvKeysUn[i].octave
-                                                                     : (i < pKF -> NLeft) ? pKF -> mvKeys[i].octave
-                                                                                          : pKF -> mvKeysRight[i].octave;
+                        const int& scaleLevel = (pKF->NLeft == -1) ?
+                                                    pKF->mvKeysUn[i].octave :
+                                                    (i < pKF->NLeft) ? pKF->mvKeys[i].octave : pKF->mvKeysRight[i].octave;
                         const map<KeyFrame*, tuple<int,int>> observations = pMP->GetObservations();
                         int nObs=0;
                         for(map<KeyFrame*, tuple<int,int>>::const_iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)
@@ -1229,7 +1229,7 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
     }
 
 
-    if(mpAtlas->KeyFramesInMap()<nMinKF)
+    if ((int)mpAtlas->KeyFramesInMap() < nMinKF)
         return;
 
     // Retrieve all keyframe in temporal order
@@ -1243,7 +1243,7 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
     lpKF.push_front(pKF);
     vector<KeyFrame*> vpKF(lpKF.begin(),lpKF.end());
 
-    if(vpKF.size()<nMinKF)
+    if((int)vpKF.size()<nMinKF)
         return;
 
     mFirstTs=vpKF.front()->mTimeStamp;
@@ -1386,7 +1386,7 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
     double t_inertial_only = std::chrono::duration_cast<std::chrono::duration<double> >(t1 - t0).count();
     double t_update = std::chrono::duration_cast<std::chrono::duration<double> >(t3 - t2).count();
     double t_viba = std::chrono::duration_cast<std::chrono::duration<double> >(t5 - t4).count();
-    cout << t_inertial_only << ", " << t_update << ", " << t_viba << endl;*/
+    cout << t_inertial_only << ", " << t_update << ", " << t_viba << endl; */
 
     mpCurrentKeyFrame->GetMap()->IncreaseChangeIndex();
 

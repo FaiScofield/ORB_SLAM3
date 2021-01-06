@@ -23,6 +23,7 @@
 //#define SAVE_TIMES
 
 #include "ImuTypes.h"
+#include "OdomTypes.h"
 #include "ORBVocabulary.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
@@ -32,10 +33,10 @@
 #include <vector>
 
 namespace ORB_SLAM3 {
-//#define FRAME_GRID_ROWS 48
-//#define FRAME_GRID_COLS 64
-#define FRAME_GRID_ROWS 24
-#define FRAME_GRID_COLS 32
+#define FRAME_GRID_ROWS 48
+#define FRAME_GRID_COLS 64
+// #define FRAME_GRID_ROWS 24
+// #define FRAME_GRID_COLS 32
 
 class MapPoint;
 class KeyFrame;
@@ -70,6 +71,10 @@ public:
     Frame(const cv::Mat& imGray, const cv::Mat& mask, const double& timeStamp, ORBextractor* extractor,
           ORBVocabulary* voc, GeometricCamera* pCamera, cv::Mat& distCoef, const float& bf, const float& thDepth,
           Frame* pPrevF = static_cast<Frame*>(NULL), const IMU::Calib& ImuCalib = IMU::Calib());
+    // Constructor for Monocular-Odometry
+    Frame(const cv::Mat& imGray, const cv::Mat& mask, double timeStamp, ORBextractor* extractor, ORBVocabulary* voc,
+          GeometricCamera* pCamera, cv::Mat& distCoef, const float& bf, const float& thDepth, Frame* pPrevF,
+          const ODOM::Calib& odomCalib);
 
     // Destructor
     // ~Frame();
@@ -104,6 +109,10 @@ public:
     cv::Mat GetImuRotation();
     cv::Mat GetImuPose();
 
+    cv::Mat GetOdomPosition();
+    cv::Mat GetOdomRotation();
+    cv::Mat GetOdomPose();
+
     void SetNewBias(const IMU::Bias& b);
 
     // Check if a MapPoint is in the frustum of the camera
@@ -137,7 +146,6 @@ public:
 
     cv::Mat mRwc;
     cv::Mat mOw;
-
 public:
     // Vocabulary used for relocalization.
     ORBVocabulary* mpORBvocabulary;
@@ -215,14 +223,17 @@ public:
 
     // Imu calibration
     IMU::Calib mImuCalib;
+    ODOM::Calib mOdomCalib;
 
     // Imu preintegration from last keyframe
     IMU::Preintegrated* mpImuPreintegrated;
+    // ODOM::Preintegrated* mpOdomPreintegrated;
     KeyFrame* mpLastKeyFrame;
 
     // Pointer to previous frame
     Frame* mpPrevFrame;
     IMU::Preintegrated* mpImuPreintegratedFrame;
+    // ODOM::Preintegrated* mpOdomPreintegratedFrame;
 
     // Current and Next Frame id.
     static long unsigned int nNextId;
@@ -258,6 +269,7 @@ public:
     double mTimeStereoMatch;
     double mTimeORB_Ext;
 
+    ODOM::Point mOdom;
 
 private:
     // Undistort keypoints given OpenCV distortion parameters.
@@ -279,6 +291,7 @@ private:
     bool mbImuPreintegrated;
 
     std::mutex* mpMutexImu;
+    std::mutex* mpMutexOdom;
 
 public:
     GeometricCamera *mpCamera, *mpCamera2;

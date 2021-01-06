@@ -22,6 +22,8 @@
 
 #include <mutex>
 
+#define HIDE_ORB_SLAM3_TITLE    1
+
 namespace ORB_SLAM3
 {
 
@@ -131,9 +133,11 @@ void Viewer::Run()
 {
     mbFinished = false;
     mbStopped = false;
-
+#if HIDE_ORB_SLAM3_TITLE
+    pangolin::CreateWindowAndBind("Map Viewer",1024,768);
+#else
     pangolin::CreateWindowAndBind("ORB-SLAM3: Map Viewer",1024,768);
-
+#endif
     // 3D Mouse handler requires depth testing to be enabled
     glEnable(GL_DEPTH_TEST);
 
@@ -172,8 +176,11 @@ void Viewer::Run()
     Ow.SetIdentity();
     pangolin::OpenGlMatrix Twwp; // Oriented with g in the z axis, but y and x from camera
     Twwp.SetIdentity();
+#if HIDE_ORB_SLAM3_TITLE
+    cv::namedWindow("Current Frame");
+#else
     cv::namedWindow("ORB-SLAM3: Current Frame");
-
+#endif
     bool bFollow = true;
     bool bLocalizationMode = false;
     bool bStepByStep = false;
@@ -301,8 +308,11 @@ void Viewer::Run()
         else{
             toShow = im;
         }
-
+    #if HIDE_ORB_SLAM3_TITLE
+        cv::imshow("Current Frame",toShow);
+    #else
         cv::imshow("ORB-SLAM3: Current Frame",toShow);
+    #endif
         cv::waitKey(mT);
 
         if(menuReset)

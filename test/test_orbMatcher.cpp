@@ -142,13 +142,8 @@ int main(int argc, char* argv[])
 
         // frame construction
         Mat noDistort = cv::Mat::zeros(4, 1, CV_32FC1);
-        if (bRemoveOE) {
-            frameCur = Frame(gray, mask, vTimeStamps[k], pDetector.get(), pVocabulary.get(),
-                             pCamera.get(), noDistort, 0, 0);
-        } else {
-            frameCur = Frame(gray, vTimeStamps[k], pDetector.get(), pVocabulary.get(),
-                             pCamera.get(), noDistort, 0, 0);
-        }
+        frameCur = Frame(gray, mask, vTimeStamps[k], pDetector.get(), pVocabulary.get(),
+                            pCamera.get(), noDistort, 0.f, 0.f);
         frameCur.imgLeft = gray.clone();
 
         int nMatches;

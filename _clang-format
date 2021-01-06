@@ -63,16 +63,16 @@ BraceWrapping:
   # AfterCaseLabel:  false
   AfterClass:      true
   # Never, MultiLine, Always
-  AfterControlStatement: false
-  AfterEnum:       false
+  AfterControlStatement: Always
+  AfterEnum:       true
   AfterFunction:   true
-  AfterNamespace:  false
-  AfterStruct:     false
-  AfterUnion:      false
+  AfterNamespace:  true
+  AfterStruct:     true
+  AfterUnion:      true
   AfterExternBlock:     false
   # AfterObjCDeclaration: false
-  BeforeCatch:     false
-  BeforeElse:      false
+  BeforeCatch:     true
+  BeforeElse:      true
   IndentBraces:    false
   SplitEmptyFunction:   false
   SplitEmptyRecord:     false
@@ -99,7 +99,7 @@ BreakConstructorInitializersBeforeComma: false
 BreakStringLiterals: false
 
 # 每行字符的限制，0表示没有限制
-ColumnLimit: 100
+ColumnLimit: 120
 # 描述具有特殊意义的注释的正则表达式，它不应该被分割为多行或以其它方式改变
 CommentPragmas: '^ IWYU pragma:'
 # namespace紧凑
@@ -120,7 +120,7 @@ ExperimentalAutoDetectBinPacking: false
 FixNamespaceComments: true
 ForEachMacros:   [ foreach, Q_FOREACH, BOOST_FOREACH ]
 # 头文件包含区的设置: Preserve(仅排序), Merge(去空行), Regroup(按类型加空行分开)
-IncludeBlocks: Regroup
+IncludeBlocks: Preserve
 # IncludeCategories:
 #   - Regex:         '^"(llvm|llvm-c|clang|clang-c)/'
 #     Priority:      2

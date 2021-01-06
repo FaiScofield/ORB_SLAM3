@@ -390,7 +390,7 @@ void Map::PrintEssentialGraph()
         vstrHeader.push_back("--");
         vpChilds.push_back(pKFi);
     }
-    for(int i=0; i<vpChilds.size() && count <= (mspKeyFrames.size()+10); ++i)
+    for(auto i=0; i<vpChilds.size() && count <= int(mspKeyFrames.size()+10); ++i)
     {
         count++;
         string strHeader = vstrHeader[i];
@@ -405,7 +405,7 @@ void Map::PrintEssentialGraph()
             vstrHeader.push_back(strHeader+"--");
         }
     }
-    if (count == (mspKeyFrames.size()+10))
+    if (count == int(mspKeyFrames.size()+10))
         cout << "CYCLE!!"    << endl;
 
     cout << "------------------" << endl << "End of the essential graph" << endl;
@@ -435,7 +435,7 @@ bool Map::CheckEssentialGraph(){
     for(KeyFrame* pKFi : spChilds)
         vpChilds.push_back(pKFi);
 
-    for(int i=0; i<vpChilds.size() && count <= (mspKeyFrames.size()+10); ++i)
+    for(auto i=0; i<vpChilds.size() && count <= int(mspKeyFrames.size()+10); ++i)
     {
         count++;
         KeyFrame* pKFi = vpChilds[i];
@@ -445,7 +445,7 @@ bool Map::CheckEssentialGraph(){
     }
 
     cout << "count/tot" << count << "/" << mspKeyFrames.size() << endl;
-    if (count != (mspKeyFrames.size()-1))
+    if (count != int(mspKeyFrames.size()-1))
         return false;
     else
         return true;
@@ -502,7 +502,7 @@ void Map::printReprojectionError(list<KeyFrame*> &lpLocalWindowKFs, KeyFrame* mp
 
         vector<MapPoint*> vpMPs = pKFi->GetMapPointMatches();
         int num_points = 0;
-        for(int j=0; j<vpMPs.size(); ++j)
+        for(auto j=0; j<vpMPs.size(); ++j)
         {
             MapPoint* pMPij = vpMPs[j];
             if(!pMPij || pMPij->isBad())

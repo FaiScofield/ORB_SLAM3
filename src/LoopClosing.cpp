@@ -616,7 +616,7 @@ bool LoopClosing::DetectCommonRegionsFromBoW(std::vector<KeyFrame*> &vpBowCand, 
         std::vector<KeyFrame*> vpKeyFrameMatchedMP = std::vector<KeyFrame*>(mpCurrentKF->GetMapPointMatches().size(), static_cast<KeyFrame*>(NULL));
 
         int nIndexMostBoWMatchesKF=0;
-        for(int j=0; j<vpCovKFi.size(); ++j)
+        for(auto j=0; j<vpCovKFi.size(); ++j)
         {
             if(!vpCovKFi[j] || vpCovKFi[j]->isBad())
                 continue;
@@ -631,7 +631,7 @@ bool LoopClosing::DetectCommonRegionsFromBoW(std::vector<KeyFrame*> &vpBowCand, 
         }
 
         bool bAbortByNearKF = false;
-        for(int j=0; j<vpCovKFi.size(); ++j)
+        for(auto j=0; j<vpCovKFi.size(); ++j)
         {
             if(spConnectedKeyFrames.find(vpCovKFi[j]) != spConnectedKeyFrames.end())
             {
@@ -641,7 +641,7 @@ bool LoopClosing::DetectCommonRegionsFromBoW(std::vector<KeyFrame*> &vpBowCand, 
             }
 
             //cout << "Matches: " << num << endl;
-            for(int k=0; k < vvpMatchedMPs[j].size(); ++k)
+            for(auto k=0; k < vvpMatchedMPs[j].size(); ++k)
             {
                 MapPoint* pMPi_j = vvpMatchedMPs[j][k];
                 if(!pMPi_j || pMPi_j->isBad())
@@ -803,7 +803,7 @@ bool LoopClosing::DetectCommonRegionsFromBoW(std::vector<KeyFrame*> &vpBowCand, 
                             //cout << "---" << endl;
                             //cout << "BoW: Geometrical validation" << endl;
                             int j = 0;
-                            while(nNumKFs < 3 && j<vpCurrentCovKFs.size())
+                            while(nNumKFs < 3 && j<(int)vpCurrentCovKFs.size())
                             //for(int j=0; j<vpCurrentCovKFs.size(); ++j)
                             {
                                 KeyFrame* pKFj = vpCurrentCovKFs[j];
@@ -885,7 +885,7 @@ bool LoopClosing::DetectCommonRegionsFromBoW(std::vector<KeyFrame*> &vpBowCand, 
     {
         int maxStage = -1;
         int maxMatched;
-        for(int i=0; i<vnStage.size(); ++i)
+        for(auto i=0; i<vnStage.size(); ++i)
         {
             if(vnStage[i] > maxStage)
             {
@@ -970,7 +970,7 @@ int LoopClosing::FindMatchesByProjection(KeyFrame* pCurrentKF, KeyFrame* pMatche
         vector<KeyFrame*> vpKFs = vpCovKFm[i]->GetBestCovisibilityKeyFrames(nNumCovisibles);
         int nInserted = 0;
         int j = 0;
-        while(j < vpKFs.size() && nInserted < nNumCovisibles)
+        while(j < (int)vpKFs.size() && nInserted < nNumCovisibles)
         {
             if(spCheckKFs.find(vpKFs[j]) == spCheckKFs.end() && spCurrentCovisbles.find(vpKFs[j]) == spCurrentCovisbles.end())
             {
@@ -1345,7 +1345,7 @@ void LoopClosing::MergeLocal()
     Verbose::PrintMess("MERGE-VISUAL: Initial number of KFs in local window from active map: " + to_string(spLocalWindowKFs.size()), Verbose::VERBOSITY_DEBUG);
     const int nMaxTries = 3;
     int nNumTries = 0;
-    while(spLocalWindowKFs.size() < numTemporalKFs && nNumTries < nMaxTries)
+    while((int)spLocalWindowKFs.size() < numTemporalKFs && nNumTries < nMaxTries)
     {
         vector<KeyFrame*> vpNewCovKFs;
         vpNewCovKFs.empty();
@@ -1409,7 +1409,7 @@ void LoopClosing::MergeLocal()
     spMergeConnectedKFs.insert(vpCovisibleKFs.begin(), vpCovisibleKFs.end());
     Verbose::PrintMess("MERGE-VISUAL: Initial number of KFs in the local window from matched map: " + to_string(spMergeConnectedKFs.size()), Verbose::VERBOSITY_DEBUG);
     nNumTries = 0;
-    while(spMergeConnectedKFs.size() < numTemporalKFs && nNumTries < nMaxTries)
+    while((int)spMergeConnectedKFs.size() < numTemporalKFs && nNumTries < nMaxTries)
     {
         vector<KeyFrame*> vpNewCovKFs;
         for(KeyFrame* pKFi : spMergeConnectedKFs)
@@ -1744,7 +1744,7 @@ void LoopClosing::MergeLocal()
         Verbose::PrintMess("MERGE-VISUAL: Calculate the new position of the elements outside of the window", Verbose::VERBOSITY_DEBUG);
         //Apply the transformation
         {
-            if(mpTracker->mSensor == System::MONOCULAR)
+            if(mpTracker->mSensor == System::MONOCULAR || mpTracker->mSensor == System::ODOM_MONOCULAR)
             {
                 unique_lock<mutex> currentLock(pCurrentMap->mMutexMapUpdate); // We update the current map with the Merge information
 
@@ -1910,7 +1910,7 @@ void LoopClosing::printReprojectionError(set<KeyFrame*> &spLocalWindowKFs, KeyFr
 
         vector<MapPoint*> vpMPs = pKFi->GetMapPointMatches();
         int num_points = 0;
-        for(int j=0; j<vpMPs.size(); ++j)
+        for(auto j=0; j<vpMPs.size(); ++j)
         {
             MapPoint* pMPij = vpMPs[j];
             if(!pMPij || pMPij->isBad())

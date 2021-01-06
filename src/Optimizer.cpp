@@ -233,7 +233,7 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
             if(pKF->mpCamera2){
                 int rightIndex = get<1>(mit->second);
 
-                if(rightIndex != -1 && rightIndex < pKF->mvKeysRight.size()){
+                if(rightIndex != -1 && rightIndex < (int)pKF->mvKeysRight.size()){
                     rightIndex -= pKF->NLeft;
 
                     Eigen::Matrix<double,2,1> obs;
@@ -718,7 +718,7 @@ void Optimizer::FullInertialBA(Map *pMap, int its, const bool bFixLocal, const l
                 if(pKFi->mpCamera2){ // Monocular right observation
                     int rightIndex = get<1>(mit->second);
 
-                    if(rightIndex != -1 && rightIndex < pKFi->mvKeysRight.size()){
+                    if(rightIndex != -1 && rightIndex < (int)pKFi->mvKeysRight.size()){
                         rightIndex -= pKFi->NLeft;
 
                         Eigen::Matrix<double,2,1> obs;
@@ -1245,9 +1245,9 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, vector<Ke
         //Verbose::PrintMess("LM-LBA: New Fixed KFs had been set", Verbose::VERBOSITY_NORMAL);
         //TODO We set 2 KFs to fixed to avoid a degree of freedom in scale
         list<KeyFrame*>::iterator lit=lLocalKeyFrames.begin();
-        int lowerId = pKF->mnId;
+        auto lowerId = pKF->mnId;
         KeyFrame* pLowerKf;
-        int secondLowerId = pKF->mnId;
+        auto secondLowerId = pKF->mnId;
         KeyFrame* pSecondLowerKF;
 
         for(; lit != lLocalKeyFrames.end(); lit++)
@@ -5304,7 +5304,7 @@ void Optimizer::InertialOptimization(Map *pMap, Eigen::Matrix3d &Rwg, double &sc
     //Keyframes velocities and biases
     std::cout << "update Keyframes velocities and biases" << std::endl;
 
-    const int N = vpKFs.size();
+    const size_t N = vpKFs.size();
     for(size_t i=0; i<N; i++)
     {
         KeyFrame* pKFi = vpKFs[i];
@@ -5469,7 +5469,7 @@ void Optimizer::InertialOptimization(Map *pMap, Eigen::Vector3d &bg, Eigen::Vect
     cv::Mat cvbg = Converter::toCvMat(bg);
 
     //Keyframes velocities and biases
-    const int N = vpKFs.size();
+    const size_t N = vpKFs.size();
     for(size_t i=0; i<N; i++)
     {
         KeyFrame* pKFi = vpKFs[i];
@@ -5630,7 +5630,7 @@ void Optimizer::InertialOptimization(vector<KeyFrame*> vpKFs, Eigen::Vector3d &b
     cv::Mat cvbg = Converter::toCvMat(bg);
 
     //Keyframes velocities and biases
-    const int N = vpKFs.size();
+    const size_t N = vpKFs.size();
     for(size_t i=0; i<N; i++)
     {
         KeyFrame* pKFi = vpKFs[i];
@@ -6646,7 +6646,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pMainKF,vector<KeyFrame*> vpAdju
 
                 int numPointsMono = 0, numPointsStereo = 0;
                 int numPointsMonoBad = 0, numPointsStereoBad = 0;
-                for(int i=0; i<vpMonoMPsOpt.size(); ++i)
+                for(auto i=0; i<vpMonoMPsOpt.size(); ++i)
                 {
                     if(!vpMonoMPsOpt[i] || vpMonoMPsOpt[i]->isBad())
                     {
@@ -6666,7 +6666,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pMainKF,vector<KeyFrame*> vpAdju
                     numPointsMono++;
                  }
 
-                 for(int i=0; i<vpStereoMPsOpt.size(); ++i)
+                 for(auto i=0; i<vpStereoMPsOpt.size(); ++i)
                  {
                      if(!vpStereoMPsOpt[i] || vpStereoMPsOpt[i]->isBad())
                      {
@@ -6686,7 +6686,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pMainKF,vector<KeyFrame*> vpAdju
                       numPointsStereo++;
                  }
 
-                 for(int i=0; i<vpMonoMPsBad.size(); ++i)
+                 for(auto i=0; i<vpMonoMPsBad.size(); ++i)
                  {
                      if(!vpMonoMPsBad[i] || vpMonoMPsBad[i]->isBad())
                      {
@@ -6705,7 +6705,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame* pMainKF,vector<KeyFrame*> vpAdju
                     //cv::putText(imLeft, strNumOBs, pKF->mvKeys[i].pt, CV_FONT_HERSHEY_DUPLEX, 1, cv::Scalar(255, 0, 0));
                     numPointsMonoBad++;
                 }
-                for(int i=0; i<vpStereoMPsBad.size(); ++i)
+                for(auto i=0; i<vpStereoMPsBad.size(); ++i)
                 {
                     if(!vpStereoMPsBad[i] || vpStereoMPsBad[i]->isBad())
                     {

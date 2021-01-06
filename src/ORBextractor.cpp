@@ -1120,7 +1120,7 @@ static void computeDescriptors(const Mat& image, vector<KeyPoint>& keypoints, Ma
         else
             nOutliers++;
     }
-    cout << "computeDescriptors(): number outliers: " << nOutliers << " / " << N << endl;
+    // cout << "computeDescriptors(): number outliers: " << nOutliers << " / " << N << endl;
 }
 
 int ORBextractor::operator()(InputArray _image, InputArray _mask, vector<KeyPoint>& _keypoints,
