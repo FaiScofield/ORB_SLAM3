@@ -670,6 +670,8 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const std::vector
 int ORBmatcher::SearchForInitialization(Frame& F1, Frame& F2, vector<cv::Point2f>& vbPrevMatched,
                                         vector<int>& vnMatches12, int windowSize)
 {
+    assert(vbPrevMatched.size() == F1.mvKeysUn.size());
+
     int nmatches = 0;
     vnMatches12 = vector<int>(F1.mvKeysUn.size(), -1);
 
@@ -682,7 +684,8 @@ int ORBmatcher::SearchForInitialization(Frame& F1, Frame& F2, vector<cv::Point2f
     vector<int> vMatchedDistance(F2.mvKeysUn.size(), INT_MAX);
     vector<int> vnMatches21(F2.mvKeysUn.size(), -1);
 
-    for (size_t i1 = 0, iend1 = F1.mvKeysUn.size(); i1 < iend1; i1++) {
+    for (size_t i1 = 0, iend1 = F1.mvKeysUn.size(); i1 < iend1; i1++)
+    {
         const cv::KeyPoint& kp1 = F1.mvKeysUn[i1];
         int level1 = kp1.octave;
         // if (level1 > 0)

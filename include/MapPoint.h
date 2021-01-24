@@ -197,8 +197,8 @@ public:
     bool mbTrackInView, mbTrackInViewR;
     int mnTrackScaleLevel, mnTrackScaleLevelR;
     float mTrackViewCos, mTrackViewCosR;
-    long unsigned int mnTrackReferenceForFrame;
-    long unsigned int mnLastFrameSeen;
+    long unsigned int mnTrackReferenceForFrame; // index of the frame, who is updating the local MPs
+    long unsigned int mnLastFrameSeen;          // index of the last frame, who saw this MP
 
     // Variables used by local mapping
     long unsigned int mnBALocalForKF;

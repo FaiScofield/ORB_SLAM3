@@ -34,7 +34,7 @@
 #include "LocalMapping.h"
 #include "LoopClosing.h"
 #include "MapDrawer.h"
-#include "Odometry.h"
+// #include "Odometry.h"
 #include "ORBVocabulary.h"
 #include "ORBextractor.h"
 #include "System.h"
@@ -220,6 +220,11 @@ protected:
     void ComputeGyroBias(const vector<Frame*> &vpFs, float &bwx,  float &bwy, float &bwz);
     void ComputeVelocitiesAccBias(const vector<Frame*> &vpFs, float &bax,  float &bay, float &baz);
 
+    bool AcceptMPDepth(const cv::Point3f& P3D);
+    bool AcceptMPDepth(const cv::Mat& P3D);
+    bool TriangulateWithOdometry(const std::vector<cv::KeyPoint>& vKeys1, const std::vector<cv::KeyPoint>& vKeys2, 
+                                 const std::vector<int>& vMatches12, cv::Mat& R21, cv::Mat& t21,
+                                 std::vector<cv::Point3f>& vP3D, std::vector<bool>& vbTriangulated);
 
     bool mbMapUpdated;
 

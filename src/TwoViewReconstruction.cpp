@@ -17,7 +17,7 @@
 */
 
 #include "TwoViewReconstruction.h"
-
+#include "auxiliar.h"
 #include "Thirdparty/DBoW2/DUtils/Random.h"
 
 #include<thread>
@@ -500,15 +500,17 @@ bool TwoViewReconstruction::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat
     int nGood2 = CheckRT(R2,t1,mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,K, vP3D2, 4.0*mSigma2, vbTriangulated2, parallax2);
     int nGood3 = CheckRT(R1,t2,mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,K, vP3D3, 4.0*mSigma2, vbTriangulated3, parallax3);
     int nGood4 = CheckRT(R2,t2,mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,K, vP3D4, 4.0*mSigma2, vbTriangulated4, parallax4);
+    CLOGT("Good 3D Ponts triangulated numbers:  %d/%d/%d/%d\n", nGood1, nGood2, nGood3, nGood4);
+    CLOGT("Good 3D Ponts triangulated parallax: %.2f/%.2f/%.2f/%.2f\n", parallax1, parallax2, parallax3, parallax4);
 
     int maxGood = max(nGood1,max(nGood2,max(nGood3,nGood4)));
 
     R21 = cv::Mat();
     t21 = cv::Mat();
 
-    int nMinGood = max(static_cast<int>(0.8*N),minTriangulated);    // org 0.9
+    int nMinGood = max(static_cast<int>(0.8*N), minTriangulated);    // org 0.9
 
-    float ratio = 0.6;  // org 0.7
+    float ratio = 0.7;
     int nsimilar = 0;
     if (nGood1 > ratio * maxGood)
         nsimilar++;
@@ -520,15 +522,16 @@ bool TwoViewReconstruction::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat
         nsimilar++;
 
     // If there is not a clear winner or not enough triangulated points reject initialization
-    if(maxGood<nMinGood || nsimilar>1)
+    if (maxGood < nMinGood || nsimilar > 1)
     {
+        CLOGT("ReconstructF failed: not a clear winner(%d) or not enough triangulated points(%d) < (0.8 * %d = %d)\n", nsimilar, maxGood, N, nMinGood);
         return false;
     }
 
     // If best reconstruction has enough parallax initialize
-    if(maxGood==nGood1)
+    if (maxGood == nGood1)
     {
-        if(parallax1>minParallax)
+        if (parallax1 > minParallax)
         {
             vP3D = vP3D1;
             vbTriangulated = vbTriangulated1;
@@ -537,9 +540,10 @@ bool TwoViewReconstruction::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat
             t1.copyTo(t21);
             return true;
         }
-    }else if(maxGood==nGood2)
+    }
+    else if (maxGood == nGood2)
     {
-        if(parallax2>minParallax)
+        if (parallax2 > minParallax)
         {
             vP3D = vP3D2;
             vbTriangulated = vbTriangulated2;
@@ -548,9 +552,10 @@ bool TwoViewReconstruction::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat
             t1.copyTo(t21);
             return true;
         }
-    }else if(maxGood==nGood3)
+    }
+    else if (maxGood == nGood3)
     {
-        if(parallax3>minParallax)
+        if (parallax3 > minParallax)
         {
             vP3D = vP3D3;
             vbTriangulated = vbTriangulated3;
@@ -559,9 +564,10 @@ bool TwoViewReconstruction::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat
             t2.copyTo(t21);
             return true;
         }
-    }else if(maxGood==nGood4)
+    }
+    else if (maxGood == nGood4)
     {
-        if(parallax4>minParallax)
+        if (parallax4 > minParallax)
         {
             vP3D = vP3D4;
             vbTriangulated = vbTriangulated4;
@@ -571,7 +577,7 @@ bool TwoViewReconstruction::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat
             return true;
         }
     }
-
+    CLOGT("ReconstructF failed: max-good-parallax is <= minParallax(%f)\n", minParallax);
     return false;
 }
 
@@ -707,7 +713,7 @@ bool TwoViewReconstruction::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat
         vector<bool> vbTriangulatedi;
         int nGood = CheckRT(vR[i],vt[i],mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,K,vP3Di, 4.0*mSigma2, vbTriangulatedi, parallaxi);
 
-        if(nGood>bestGood)
+        if (nGood > bestGood)
         {
             secondBestGood = bestGood;
             bestGood = nGood;
@@ -716,14 +722,15 @@ bool TwoViewReconstruction::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat
             bestP3D = vP3Di;
             bestTriangulated = vbTriangulatedi;
         }
-        else if(nGood>secondBestGood)
+        else if (nGood > secondBestGood)
         {
             secondBestGood = nGood;
         }
     }
 
 
-    if(secondBestGood<0.70*bestGood && bestParallax>=minParallax && bestGood>minTriangulated && bestGood>0.8*N) // org 0.75, 0.9
+    if (secondBestGood < 0.75 * bestGood && bestParallax >= minParallax && 
+        bestGood > minTriangulated && bestGood > 0.8 * N)  // org 0.9
     {
         vR[bestSolutionIdx].copyTo(R21);
         vt[bestSolutionIdx].copyTo(t21);
@@ -799,7 +806,7 @@ void TwoViewReconstruction::Normalize(const vector<cv::KeyPoint> &vKeys, vector<
     T.at<float>(1,2) = -meanY*sY;
 }
 
-
+/* NOTE: R means R21, t means t21 */ 
 int TwoViewReconstruction::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::KeyPoint> &vKeys1, const vector<cv::KeyPoint> &vKeys2,
                        const vector<Match> &vMatches12, vector<bool> &vbMatchesInliers,
                        const cv::Mat &K, vector<cv::Point3f> &vP3D, float th2, vector<bool> &vbGood, float &parallax)
@@ -898,15 +905,15 @@ int TwoViewReconstruction::CheckRT(const cv::Mat &R, const cv::Mat &t, const vec
             vbGood[vMatches12[i].first]=true;
     }
 
-    if(nGood>0)
+    if (nGood > 0)
     {
-        sort(vCosParallax.begin(),vCosParallax.end());
+        sort(vCosParallax.begin(), vCosParallax.end());
 
-        size_t idx = min(50,int(vCosParallax.size()-1));
-        parallax = acos(vCosParallax[idx])*180/CV_PI;
+        size_t idx = min(50, int(vCosParallax.size() - 1));
+        parallax = acos(vCosParallax[idx]) * 180 / CV_PI;
     }
     else
-        parallax=0;
+        parallax = 0;
 
     return nGood;
 }

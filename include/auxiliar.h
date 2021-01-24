@@ -88,11 +88,12 @@ inline double vector_mad(std::vector<double> residues)
 #define LOGD(msg) (std::cout << "\033[34m-- |D| " << msg << "\033[0m" << std::endl)
 #define LOGT(msg) (std::cout << "\033[32m-- |T| " << msg << "\033[0m" << std::endl)
 
-#define K_LOGE(id, msg) (std::cerr << "\033[31m-- |E| #" << id << " " << msg << "\033[0m" << std::endl)
-#define K_LOGW(id, msg) (std::cerr << "\033[33m-- |W| #" << id << " " << msg << "\033[0m" << std::endl)
-#define K_LOGI(id, msg) (std::cout << "\033[00m-- |I| #" << id << " " << msg << "\033[0m" << std::endl)
-#define K_LOGD(id, msg) (std::cout << "\033[34m-- |D| #" << id << " " << msg << "\033[0m" << std::endl)
-#define K_LOGT(id, msg) (std::cout << "\033[32m-- |T| #" << id << " " << msg << "\033[0m" << std::endl)
+#define CLOGF(fmt, ...) { printf("-- |F| " fmt "", ##__VA_ARGS__); }
+#define CLOGE(fmt, ...) { printf("-- |E| " fmt "", ##__VA_ARGS__); }
+#define CLOGW(fmt, ...) { printf("-- |W| " fmt "", ##__VA_ARGS__); }
+#define CLOGI(fmt, ...) { printf("-- |I| " fmt "", ##__VA_ARGS__); }
+#define CLOGD(fmt, ...) { printf("-- |D| " fmt "", ##__VA_ARGS__); }
+#define CLOGT(fmt, ...) { printf("-- |T| " fmt "", ##__VA_ARGS__); }
 
 // -pi ~ +pi
 inline double NormalizeAngle(double theta)
