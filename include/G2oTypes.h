@@ -20,13 +20,22 @@
 #ifndef G2OTYPES_H
 #define G2OTYPES_H
 
+#if HAVE_G2O
+#include <g2o/core/base_vertex.h>
+#include <g2o/core/base_binary_edge.h>
+#include <g2o/types/sba/types_sba.h>
+#include <g2o/core/base_multi_edge.h>
+#include <g2o/core/base_unary_edge.h>
+#else
+#include "Thirdparty/g2o/g2o/core/eigen_types.h"
 #include "Thirdparty/g2o/g2o/core/base_vertex.h"
 #include "Thirdparty/g2o/g2o/core/base_binary_edge.h"
 #include "Thirdparty/g2o/g2o/types/types_sba.h"
 #include "Thirdparty/g2o/g2o/core/base_multi_edge.h"
 #include "Thirdparty/g2o/g2o/core/base_unary_edge.h"
+#endif
 
-#include<opencv2/core/core.hpp>
+#include <opencv2/core/core.hpp>
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -35,8 +44,9 @@
 #include <Frame.h>
 #include <KeyFrame.h>
 
-#include"Converter.h"
+#include "Converter.h"
 #include <math.h>
+
 
 namespace ORB_SLAM3
 {
@@ -45,13 +55,17 @@ class KeyFrame;
 class Frame;
 class GeometricCamera;
 
-typedef Eigen::Matrix<double, 6, 1> Vector6d;
-typedef Eigen::Matrix<double, 9, 1> Vector9d;
-typedef Eigen::Matrix<double, 12, 1> Vector12d;
-typedef Eigen::Matrix<double, 15, 1> Vector15d;
-typedef Eigen::Matrix<double, 12, 12> Matrix12d;
-typedef Eigen::Matrix<double, 15, 15> Matrix15d;
-typedef Eigen::Matrix<double, 9, 9> Matrix9d;
+typedef Eigen::Matrix<double, 6, 1>     Vector6d;
+typedef Eigen::Matrix<double, 7, 1>     Vector7d;
+typedef Eigen::Matrix<double, 9, 1>     Vector9d;
+typedef Eigen::Matrix<double, 12, 1>    Vector12d;
+typedef Eigen::Matrix<double, 15, 1>    Vector15d;
+typedef Eigen::Matrix<double, 6, 6>     Matrix6d;
+typedef Eigen::Matrix<double, 7, 7>     Matrix7d;
+typedef Eigen::Matrix<double, 9, 9>     Matrix9d;
+typedef Eigen::Matrix<double, 12, 12>   Matrix12d;
+typedef Eigen::Matrix<double, 15, 15>   Matrix15d;
+
 
 Eigen::Matrix3d ExpSO3(const double x, const double y, const double z);
 Eigen::Matrix3d ExpSO3(const Eigen::Vector3d &w);
@@ -857,6 +871,25 @@ public:
     Eigen::Matrix3d dRij;
     Eigen::Vector3d dtij;
 };
+
+
+class EdgeSE3ExpmapPrior : public g2o::BaseUnaryEdge<6, g2o::SE3Quat, g2o::VertexSE3Expmap>
+{
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    EdgeSE3ExpmapPrior();
+
+    // Useless functions we don't care
+    virtual bool read(std::istream& is);
+    virtual bool write(std::ostream& os) const;
+
+    void computeError();
+
+    void setMeasurement(const g2o::SE3Quat& m);
+
+    virtual void linearizeOplus();
+};
+
 
 } //namespace ORB_SLAM2
 

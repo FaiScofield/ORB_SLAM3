@@ -163,6 +163,7 @@ public:
     double t0ODOM; // time-stamp of ODOM initialization
 
     int mnInitFailedCnt;
+    float mInitDeltaTrans;
 
     vector<MapPoint*> GetLocalMapMPS();
 

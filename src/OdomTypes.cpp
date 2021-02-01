@@ -533,6 +533,11 @@ Point& Point::operator=(const Point& that)
     return *this;
 }
 
+float Point::normSquare() const
+{
+    return data.x * data.x + data.y * data.y;
+}
+
 cv::Mat Point::toCvSE3() const
 {
     float c = cos(data.z);

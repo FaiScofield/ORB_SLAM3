@@ -19,6 +19,7 @@
 #include "G2oTypes.h"
 #include "ImuTypes.h"
 #include "Converter.h"
+
 namespace ORB_SLAM3
 {
 
@@ -1074,4 +1075,94 @@ Eigen::Matrix3d NormalizeRotation(const Eigen::Matrix3d &R)
     Eigen::JacobiSVD<Eigen::Matrix3d> svd(R,Eigen::ComputeFullU | Eigen::ComputeFullV);
     return svd.matrixU()*svd.matrixV();
 }
+
+Matrix6d invJJl(const Vector6d& v6d)
+{
+    //! rho: translation; phi: rotation
+    //! vector order: [rot, trans]
+    g2o::Vector3D rho, phi;
+    for (int i = 0; i < 3; i++) {
+        phi[i] = v6d[i];
+        rho[i] = v6d[i + 3];
+    }
+    double theta = phi.norm();
+    g2o::Matrix3D Phi = g2o::skew(phi);
+    g2o::Matrix3D Rho = g2o::skew(rho);
+    double sint = sin(theta);
+    double cost = cos(theta);
+    double theta2 = theta * theta;
+    double theta3 = theta * theta2;
+    double theta4 = theta2 * theta2;
+    double theta5 = theta4 * theta;
+    double invtheta = 1. / theta;
+    double invtheta3 = 1. / theta3;
+    double invtheta4 = 1. / theta4;
+    double invtheta5 = 1. / theta5;
+    g2o::Matrix3D PhiRho = Phi * Rho;
+    g2o::Matrix3D RhoPhi = Rho * Phi;
+    g2o::Matrix3D PhiRhoPhi = PhiRho * Phi;
+    g2o::Matrix3D PhiPhiRho = Phi * PhiRho;
+    g2o::Matrix3D RhoPhiPhi = RhoPhi * Phi;
+    g2o::Matrix3D PhiRhoPhiPhi = PhiRhoPhi * Phi;
+    g2o::Matrix3D PhiPhiRhoPhi = Phi * PhiRhoPhi;
+
+    double temp = (1. - 0.5 * theta2 - cost) * invtheta4;
+
+    g2o::Matrix3D Ql = 0.5 * Rho + (theta - sint) * invtheta3 * (PhiRho + RhoPhi + PhiRhoPhi) -
+                  temp * (PhiPhiRho + RhoPhiPhi - 3. * PhiRhoPhi) -
+                  0.5 * (temp - (3. * (theta - sint) + theta3 * 0.5) * invtheta5) * (PhiRhoPhiPhi + PhiPhiRhoPhi);
+
+    double thetahalf = theta * 0.5;
+    double cothalf = tan(M_PI_2 - thetahalf);
+    g2o::Vector3D a = phi * invtheta;
+    g2o::Matrix3D invJl = thetahalf * cothalf * g2o::Matrix3D::Identity() +
+                     (1 - thetahalf * cothalf) * a * a.transpose() - thetahalf * g2o::skew(a);
+
+    Matrix6d invJJl = Matrix6d::Zero();
+    invJJl.block<3, 3>(0, 0) = invJl;
+    invJJl.block<3, 3>(3, 0) = -invJl * Ql * invJl;
+    invJJl.block<3, 3>(3, 3) = invJl;
+    return invJJl;
+}
+
+/// EdgeSE3ExpmapPrior
+EdgeSE3ExpmapPrior::EdgeSE3ExpmapPrior() : g2o::BaseUnaryEdge<6, g2o::SE3Quat, g2o::VertexSE3Expmap>()
+{
+    setMeasurement(g2o::SE3Quat());
+    information().setIdentity();
+}
+
+void EdgeSE3ExpmapPrior::computeError()
+{
+    g2o::VertexSE3Expmap* v = static_cast<g2o::VertexSE3Expmap*>(_vertices[0]);
+    g2o::SE3Quat err = _measurement * v->estimate();//.inverse();
+    _error = err.log();
+}
+
+void EdgeSE3ExpmapPrior::setMeasurement(const g2o::SE3Quat& m)
+{
+    _measurement = m;
+}
+
+void EdgeSE3ExpmapPrior::linearizeOplus()
+{
+    g2o::VertexSE3Expmap *v = static_cast<g2o::VertexSE3Expmap*>(_vertices[0]);
+    Vector6d err = (_measurement * v->estimate().inverse() ).log();
+    _jacobianOplusXi = -invJJl(-err);
+    //    _jacobianOplusXi = - _measurementInverseAdj;
+    // _jacobianOplusXi = -g2o::Matrix6d::Identity();
+    //    _jacobianOplusXi = _measurementInverseAdj;
+}
+
+bool EdgeSE3ExpmapPrior::read(istream& is)
+{
+    return true;
+}
+
+bool EdgeSE3ExpmapPrior::write(ostream& os) const
+{
+    return true;
+}
+
+
 }

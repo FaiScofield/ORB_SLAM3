@@ -20,11 +20,20 @@
 #ifndef CONVERTER_H
 #define CONVERTER_H
 
-#include<opencv2/core/core.hpp>
+#include <opencv2/core/core.hpp>
 
-#include<Eigen/Dense>
-#include"Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
-#include"Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+#include <Eigen/Dense>
+#if HAVE_G2O
+#include <g2o/core/eigen_types.h>
+#include <g2o/types/sba/types_six_dof_expmap.h>
+#include <g2o/types/sim3/types_seven_dof_expmap.h>
+#include <g2o/types/slam3d/isometry3d_mappings.h>
+#else
+#include "Thirdparty/g2o/g2o/core/eigen_types.h"
+#include "Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
+#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+#endif
+
 
 namespace ORB_SLAM3
 {
@@ -55,6 +64,9 @@ public:
 
     static bool isRotationMatrix(const cv::Mat &R);
     static std::vector<float> toEuler(const cv::Mat &R);
+
+    static g2o::Isometry3D toIsometry3D(const cv::Mat& T);
+    static g2o::Isometry3D toIsometry3D(const g2o::SE3Quat& se3quat);
 
 };
 

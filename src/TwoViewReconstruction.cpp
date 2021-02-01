@@ -508,7 +508,7 @@ bool TwoViewReconstruction::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat
     R21 = cv::Mat();
     t21 = cv::Mat();
 
-    int nMinGood = max(static_cast<int>(0.8*N), minTriangulated);    // org 0.9
+    int nMinGood = max(static_cast<int>(0.5*N), minTriangulated);    // org 0.9
 
     float ratio = 0.7;
     int nsimilar = 0;
@@ -524,7 +524,7 @@ bool TwoViewReconstruction::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat
     // If there is not a clear winner or not enough triangulated points reject initialization
     if (maxGood < nMinGood || nsimilar > 1)
     {
-        CLOGT("ReconstructF failed: not a clear winner(%d) or not enough triangulated points(%d) < (0.8 * %d = %d)\n", nsimilar, maxGood, N, nMinGood);
+        CLOGT("ReconstructF failed: not a clear winner(%d) or not enough triangulated points(%d) < (0.5 * %d = %d)\n", nsimilar, maxGood, N, nMinGood);
         return false;
     }
 
@@ -730,7 +730,7 @@ bool TwoViewReconstruction::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat
 
 
     if (secondBestGood < 0.75 * bestGood && bestParallax >= minParallax && 
-        bestGood > minTriangulated && bestGood > 0.8 * N)  // org 0.9
+        bestGood > minTriangulated && bestGood > 0.5 * N)  // org 0.75, 0.9
     {
         vR[bestSolutionIdx].copyTo(R21);
         vt[bestSolutionIdx].copyTo(t21);

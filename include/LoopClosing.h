@@ -31,7 +31,12 @@
 #include <boost/algorithm/string.hpp>
 #include <thread>
 #include <mutex>
+
+#if HAVE_G2O
+#include <g2o/types/sim3/types_seven_dof_expmap.h>
+#else
 #include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+#endif
 
 namespace ORB_SLAM3
 {

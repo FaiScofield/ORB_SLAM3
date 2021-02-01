@@ -67,6 +67,9 @@ int main(int argc, char const* argv[])
     }
     rec.close();
     LOGI("Read " << vOdometries.size() << " odometry data.");
+    if (vOdometries.size() == 0) {
+        return -1;
+    }
 
     bool bSorted = is_sorted(vTimestamps.begin(), vTimestamps.end());  // ASC (ascending order default)
     if (!bSorted) {

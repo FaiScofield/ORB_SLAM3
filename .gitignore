@@ -53,3 +53,4 @@ bin/
 _clang-format
 build-master/
 build-release/
+build-qt-debug/

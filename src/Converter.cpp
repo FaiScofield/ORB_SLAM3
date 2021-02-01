@@ -214,4 +214,23 @@ std::vector<float> Converter::toEuler(const cv::Mat &R)
     return v_euler;
 }
 
+g2o::Isometry3D Converter::toIsometry3D(const cv::Mat& T)
+{
+    Eigen::Matrix<double, 3, 3> R;
+    R << T.at<float>(0, 0), T.at<float>(0, 1), T.at<float>(0, 2), T.at<float>(1, 0),
+        T.at<float>(1, 1), T.at<float>(1, 2), T.at<float>(2, 0), T.at<float>(2, 1),
+        T.at<float>(2, 2);
+    g2o::Isometry3D ret = (g2o::Isometry3D)Eigen::Quaterniond(R);
+    Eigen::Vector3d t(T.at<float>(0, 3), T.at<float>(1, 3), T.at<float>(2, 3));
+    ret.translation() = t;
+    return ret;
+}
+
+g2o::Isometry3D Converter::toIsometry3D(const g2o::SE3Quat& se3quat)
+{
+    g2o::Isometry3D result = (g2o::Isometry3D)se3quat.rotation();
+    result.translation() = se3quat.translation();
+    return result;
+}
+
 } //namespace ORB_SLAM

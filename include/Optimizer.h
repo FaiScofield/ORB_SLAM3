@@ -28,6 +28,17 @@
 
 #include <math.h>
 
+#if HAVE_G2O
+#include <g2o/types/sim3/types_seven_dof_expmap.h>
+#include <g2o/core/sparse_block_matrix.h>
+#include <g2o/core/block_solver.h>
+#include <g2o/core/optimization_algorithm_levenberg.h>
+#include <g2o/core/optimization_algorithm_gauss_newton.h>
+#include <g2o/solvers/eigen/linear_solver_eigen.h>
+#include <g2o/types/sba/types_six_dof_expmap.h>
+#include <g2o/core/robust_kernel_impl.h>
+#include <g2o/solvers/dense/linear_solver_dense.h>
+#else
 #include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 #include "Thirdparty/g2o/g2o/core/sparse_block_matrix.h"
 #include "Thirdparty/g2o/g2o/core/block_solver.h"
@@ -37,6 +48,7 @@
 #include "Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
 #include "Thirdparty/g2o/g2o/core/robust_kernel_impl.h"
 #include "Thirdparty/g2o/g2o/solvers/linear_solver_dense.h"
+#endif
 
 namespace ORB_SLAM3
 {
@@ -60,6 +72,7 @@ public:
     void static MergeBundleAdjustmentVisual(KeyFrame* pCurrentKF, vector<KeyFrame*> vpWeldingKFs, vector<KeyFrame*> vpFixedKFs, bool *pbStopFlag);
 
     int static PoseOptimization(Frame* pFrame);
+    int static PoseOptimizationOnSE2(Frame* pFrame, const cv::Mat& _Tbc);
 
     int static PoseInertialOptimizationLastKeyFrame(Frame* pFrame, bool bRecInit = false);
     int static PoseInertialOptimizationLastFrame(Frame *pFrame, bool bRecInit = false);

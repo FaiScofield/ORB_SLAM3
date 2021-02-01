@@ -38,6 +38,8 @@
 using namespace cv;
 using namespace std;
 
+#define ENABLE_OPTIMAZATION_WITH_PLANAR_CONSTRAINT 0
+
 namespace ORB_SLAM3
 {
 
@@ -92,6 +94,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
 
     mbInitWith3KFs = false;
     mnInitFailedCnt = 0;
+    mInitDeltaTrans = 0.f;
 
     //Rectification parameters
     /*mbNeedRectify = false;
@@ -2228,9 +2231,10 @@ void Tracking::MonocularInitializationWithOdometry()
     const int minKPnumForInit = 50;      // org 100
     const int minKPMatchesForInit = 25;  // org 100
 
-    if (mnInitFailedCnt >= 3) {
-        LOGW("Keypoints too less for 3 times! Change initial frame!");
+    if (mnInitFailedCnt >= 3 && mInitDeltaTrans > 0.04f) {
+        CLOGW("Initialization continously failed more then 3 times && mInitDeltaTrans(%.2f) > 0.2m ! Change initial frame!", mInitDeltaTrans);
         mnInitFailedCnt = 0;
+        mInitDeltaTrans = 0.f;
         delete mpInitializer;
         mpInitializer = static_cast<Initializer*>(NULL);
         fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
@@ -2251,6 +2255,8 @@ void Tracking::MonocularInitializationWithOdometry()
 
             fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
 
+            mInitDeltaTrans = (mCurrentFrame.mOdom - mInitialFrame.mOdom).normSquare();
+
             return;
         } else {
             LOGW("Keypoints too less: " << mCurrentFrame.mvKeys.size() << " < " << minKPnumForInit);
@@ -2258,6 +2264,8 @@ void Tracking::MonocularInitializationWithOdometry()
     }
     else
     {
+        mInitDeltaTrans = (mCurrentFrame.mOdom - mInitialFrame.mOdom).normSquare();
+
         if ((int)mCurrentFrame.mvKeys.size() <= minKPnumForInit) {
             LOGW("Keypoints too less: " << mCurrentFrame.mvKeys.size() << " < " << minKPnumForInit);
             mnInitFailedCnt++;
@@ -2336,13 +2344,17 @@ void Tracking::CreateInitialMapMonocular()
     mpAtlas->AddKeyFrame(pKFini);
     mpAtlas->AddKeyFrame(pKFcur);
 
+    int nMPFiltered = 0;
     for(size_t i=0; i<mvIniMatches.size();i++)
     {
         if (mvIniMatches[i] < 0)
             continue;
 
-        if (!AcceptMPDepth(mvIniP3D[i]))
+        // filter MP depth in [1, 3]
+        if (!AcceptMPDepth(mvIniP3D[i])) {
+            nMPFiltered++;
             continue;
+        }
 
         // Create MapPoint.
         cv::Mat worldPos(mvIniP3D[i]);
@@ -2364,6 +2376,7 @@ void Tracking::CreateInitialMapMonocular()
         //Add to Map
         mpAtlas->AddMapPoint(pMP);
     }
+    LOGT(nMPFiltered << " MPs are filtered due to depth < 1.0m or < 3.0m!");
 
 
     // Update Connections
@@ -2550,7 +2563,12 @@ bool Tracking::TrackReferenceKeyFrame()
 
 
     // cout << " TrackReferenceKeyFrame mLastFrame.mTcw:  " << mLastFrame.mTcw << endl;
-    Optimizer::PoseOptimization(&mCurrentFrame);
+#if ENABLE_OPTIMAZATION_WITH_PLANAR_CONSTRAINT
+    if (mSensor == System::ODOM_MONOCULAR)
+        Optimizer::PoseOptimizationOnSE2(&mCurrentFrame, mpOdomCalib->Tcb);
+    else
+#endif
+        Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
     int nmatchesMap = 0;
@@ -2649,7 +2667,12 @@ bool Tracking::TrackWithOdometry()
     }
 
     // Optimize frame pose with all matches
-    Optimizer::PoseOptimization(&mCurrentFrame);
+#if ENABLE_OPTIMAZATION_WITH_PLANAR_CONSTRAINT
+    if (mSensor == System::ODOM_MONOCULAR)
+        Optimizer::PoseOptimizationOnSE2(&mCurrentFrame, mpOdomCalib->Tcb);
+    else
+#endif
+        Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
     int nmatchesMap = 0;
@@ -2816,7 +2839,12 @@ bool Tracking::TrackWithMotionModel()
     }
 
     // Optimize frame pose with all matches
-    Optimizer::PoseOptimization(&mCurrentFrame);
+#if ENABLE_OPTIMAZATION_WITH_PLANAR_CONSTRAINT
+    if (mSensor == System::ODOM_MONOCULAR)
+        Optimizer::PoseOptimizationOnSE2(&mCurrentFrame, mpOdomCalib->Tcb);
+    else
+#endif
+        Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
     int nmatchesMap = 0;
@@ -2878,14 +2906,25 @@ bool Tracking::TrackLocalMap()
         }
 
     int inliers;
-    if (!mpAtlas->isImuInitialized())
-        Optimizer::PoseOptimization(&mCurrentFrame);
+    if (!mpAtlas->isImuInitialized()) {
+#if ENABLE_OPTIMAZATION_WITH_PLANAR_CONSTRAINT
+        if (mSensor == System::ODOM_MONOCULAR)
+            Optimizer::PoseOptimizationOnSE2(&mCurrentFrame, mpOdomCalib->Tcb);
+        else
+#endif
+            Optimizer::PoseOptimization(&mCurrentFrame);
+    }
     else
     {
         if (mCurrentFrame.mnId <= mnLastRelocFrameId + mnFramesToResetIMU)
         {
             Verbose::PrintMess("TLM: PoseOptimization ", Verbose::VERBOSITY_DEBUG);
-            Optimizer::PoseOptimization(&mCurrentFrame);
+#if ENABLE_OPTIMAZATION_WITH_PLANAR_CONSTRAINT
+            if (mSensor == System::ODOM_MONOCULAR)
+                Optimizer::PoseOptimizationOnSE2(&mCurrentFrame, mpOdomCalib->Tcb);
+            else
+#endif
+                Optimizer::PoseOptimization(&mCurrentFrame);
         }
         else
         {
@@ -2939,7 +2978,10 @@ bool Tracking::TrackLocalMap()
     // More restrictive if there was a relocalization recently
     mpLocalMapper->mnMatchesInliers = mnMatchesInliers;
     if (mCurrentFrame.mnId < mnLastRelocFrameId + mMaxFrames && mnMatchesInliers < 30)  // org: 50
-        return false;
+    {
+        if (mSensor != System::ODOM_MONOCULAR)
+            return false;
+    }
 
     if ((mnMatchesInliers > 10) && (mState == RECENTLY_LOST))
         return true;
@@ -2947,11 +2989,12 @@ bool Tracking::TrackLocalMap()
 
     if (mSensor == System::IMU_MONOCULAR || mSensor == System::ODOM_MONOCULAR)
     {
-        // TODO: force set to true. IN frame 323 failed! to check!
+        // TODO: force set to true. IN frame 322 failed! to check!
         if (mnMatchesInliers < 15)
         {
-            LOGW("Track local map failed due to mnMatchesInliers: " << mnMatchesInliers << " < 15!");
-            return false;
+            LOGW("Track local map should failed due to mnMatchesInliers: " << mnMatchesInliers << " < 15! But force set to true!");
+            // return false;
+            return true;
         }
         else
             return true;
@@ -4467,7 +4510,6 @@ bool Tracking::TriangulateWithOdometry(const std::vector<cv::KeyPoint>& vKeys1, 
 
     vector<bool> vbMatchesInliers(vPairMatches12.size());
     fill(vbMatchesInliers.begin(), vbMatchesInliers.end(), true);
-    // vector<bool> vbTriangulated;
     vector<float> vCosParallax;
     float parallaxAngle = 0.f;    // unit: degree
     int  nGoodParallaxMPs = 0;
@@ -4482,11 +4524,13 @@ bool Tracking::TriangulateWithOdometry(const std::vector<cv::KeyPoint>& vKeys1, 
         parallaxAngle = 0.f;
 
     // TODO
-    Mat H2 = findHomography(vpt1, vpt2, noArray(), RANSAC);
-    LOGD("H from cv::findHomography: " << endl << H2);
+    // Mat H2 = findHomography(vpt1, vpt2, noArray(), RANSAC);
+    // LOGD("H from cv::findHomography: " << endl << H2);
 
     //
-    bool ok = parallaxAngle >= minParallax && nGoodParallaxMPs > 0 && n3DMPs >= 0.5 * vKeys1.size();
+    const int th_num3dMP = min(5, cvFloor(0.5 * vKeys1.size()));
+    bool ok = parallaxAngle >= minParallax && nGoodParallaxMPs > 0 && n3DMPs >= th_num3dMP;
+    CLOGD("parallaxAngle(%.2f) >= minParallax(%.2f) && n3DMPs(%d) >= th_num3dMP(%d)??\n", parallaxAngle, minParallax, n3DMPs, th_num3dMP);
     // int nGoodParallaxMPs = 0;
     // for (int i = 0, iend = vCosParallax.size(); i < iend; ++i)
     // {

@@ -17,9 +17,25 @@ void readImagesFZU(const string& strImagePath, vector<string>& vstrImages, vecto
 int main(int argc, char** argv)
 {
     const string vocabularyFile = "/home/vance/slam_ws/PL-SLAM-Mono/Vocabulary/ORBvoc.bin";
-    const string settingFile = "/home/vance/dataset/fzu/ORB-SLAM3-Config.yaml";
-    const string sequenceFolder = "/home/vance/dataset/fzu/201224_hall_1/image/";
-    const string odomRawFile = "/home/vance/dataset/fzu/201224_hall_1/odom_sync.txt";
+    string settingFile;
+    string sequenceFolder;
+    string odomRawFile;
+
+    if (argc < 3) {
+        cout << "use default parameters..." << endl;
+        settingFile = "/home/vance/dataset/fzu/ORB-SLAM3-Config.yaml";
+        sequenceFolder = "/home/vance/dataset/fzu/201224_hall_1/image/";
+        odomRawFile = "/home/vance/dataset/fzu/201224_hall_1/odom_sync.txt";
+    } else {
+        settingFile     = string(argv[1]);
+        sequenceFolder  = string(argv[2]);
+        if (argc >= 4) {
+            odomRawFile = string(argv[3]);
+        }
+    }
+    cout << "sequence: " << sequenceFolder << endl;
+    cout << "settingFile: " << settingFile << endl;
+    cout << "odomRawFile: " << odomRawFile << endl;
 
     // Retrieve paths to images
     vector<string> vstrImageFilenames;
@@ -56,7 +72,7 @@ int main(int argc, char** argv)
         }
         nOdoms = static_cast<int>(vOdometries.size());
     
-        if (nOdoms < 1 || nOdoms != nImages) {
+        if (nOdoms < 1 || nOdoms < nImages) {
             cerr << "ERROR: Failed to load odometries! nOdoms = " << nOdoms << endl;
             bWithOdom = false;
         }
@@ -82,7 +98,7 @@ int main(int argc, char** argv)
     // Main loop
     cv::Mat im, imCa;
     for (int ni = 0; ni < nImages; ni++) {
-        cout << "========================= " << ni << " =========================" << endl;
+        cout << "========================= " << ni << " / " << nImages << " =========================" << endl;
 
         // Read image from file
         im = cv::imread(vstrImageFilenames[ni], CV_LOAD_IMAGE_GRAYSCALE);

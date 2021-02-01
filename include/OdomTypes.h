@@ -53,6 +53,7 @@ public:
     Point operator-(const Point& that) const;
     Point& operator=(const Point& that);
 
+    float normSquare() const;
     // Point inverse() const
     // {
     //     float c = std::cos(data.z);

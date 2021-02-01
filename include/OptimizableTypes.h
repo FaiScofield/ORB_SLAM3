@@ -19,12 +19,23 @@
 #ifndef ORB_SLAM3_OPTIMIZABLETYPES_H
 #define ORB_SLAM3_OPTIMIZABLETYPES_H
 
-#include "Thirdparty/g2o/g2o/core/base_unary_edge.h"
-#include <Thirdparty/g2o/g2o/types/types_six_dof_expmap.h>
-#include <Thirdparty/g2o/g2o/types/sim3.h>
-
 #include <Eigen/Geometry>
 #include <include/CameraModels/GeometricCamera.h>
+
+#if HAVE_G2O
+#include <g2o/core/base_unary_edge.h>
+#include <g2o/types/sba/types_six_dof_expmap.h>
+#include <g2o/types/sim3/sim3.h>
+#include <g2o/types/slam3d/isometry3d_mappings.h>
+namespace g2o {
+typedef  Eigen::Matrix<double, 7, 1> Vector7d;
+typedef  Eigen::Matrix<double, 7, 7> Matrix7d;
+}
+#else
+#include "Thirdparty/g2o/g2o/core/base_unary_edge.h"
+#include "Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
+#include "Thirdparty/g2o/g2o/types/sim3.h"
+#endif
 
 
 namespace ORB_SLAM3 {
