@@ -95,6 +95,8 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     SetPose(F.mTcw);
 
     mnOriginMapId = pMap->GetId();
+
+    mOdom = F.mOdom;
 }
 
 void KeyFrame::ComputeBoW()
@@ -423,10 +425,10 @@ void KeyFrame::UpdateConnections(bool upParent)
     if(KFcounter.empty())
         return;
 
-    //If the counter is greater than threshold add connection
-    //In case no keyframe counter is over threshold add the one with maximum counter
-    int nmax=0;
-    KeyFrame* pKFmax=NULL;
+    // If the counter is greater than threshold add connection
+    // In case no keyframe counter is over threshold add the one with maximum counter
+    int nmax = 0;
+    KeyFrame* pKFmax = NULL;
     int th = 15;
 
     vector<pair<int,KeyFrame*> > vPairs;

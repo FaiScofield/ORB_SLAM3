@@ -115,8 +115,8 @@ if __name__ == '__main__':
     parser.add_argument('--max_difference', help='maximally allowed time difference for matching entries (default: 0.02)',default=0.02)
     args = parser.parse_args()
 
-    first_list = read_file_list(args.first_file)
-    second_list = read_file_list(args.second_file)
+    first_list = read_file_list(args.first_file, False)
+    second_list = read_file_list(args.second_file, False)
 
     matches = associate(first_list, second_list,float(args.offset),float(args.max_difference))    
 

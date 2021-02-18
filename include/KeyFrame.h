@@ -28,6 +28,7 @@
 #include "Frame.h"
 #include "KeyFrameDatabase.h"
 #include "ImuTypes.h"
+#include "OdomTypes.h"
 
 #include "GeometricCamera.h"
 
@@ -507,6 +508,7 @@ public:
     bool mbHasHessian;
     cv::Mat mHessianPose;
 
+    ODOM::Point mOdom;
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:
 

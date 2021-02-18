@@ -70,7 +70,10 @@ public:
     void RequestFinish();
     bool isFinished();
 
-    int KeyframesInQueue(){
+    void setOdometry(bool flag) { mbOdometry = flag; }
+
+    int KeyframesInQueue()
+    {
         unique_lock<std::mutex> lock(mMutexNewKFs);
         return mlNewKeyFrames.size();
     }
@@ -127,6 +130,7 @@ protected:
 
     bool mbMonocular;
     bool mbInertial;
+    bool mbOdometry;
 
     void ResetIfRequested();
     bool mbResetRequested;

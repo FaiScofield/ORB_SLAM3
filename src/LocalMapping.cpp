@@ -22,6 +22,7 @@
 #include "ORBmatcher.h"
 #include "Optimizer.h"
 #include "Converter.h"
+#include "auxiliar.h"
 
 #include<mutex>
 #include<chrono>
@@ -52,6 +53,8 @@ LocalMapping::LocalMapping(System* pSys, Atlas *pAtlas, const float bMonocular, 
 
     f_lm << "# Timestamp KF, Num CovKFs, Num KFs, Num RecentMPs, Num MPs, processKF, MPCulling, CreateMP, SearchNeigh, BA, KFCulling, [numFixKF_LBA]" << endl;
     f_lm << fixed;*/
+
+    mbOdometry = false;
 }
 
 void LocalMapping::SetLoopCloser(LoopClosing* pLoopCloser)
@@ -345,10 +348,10 @@ void LocalMapping::MapPointCulling()
     const unsigned long int nCurrentKFid = mpCurrentKeyFrame->mnId;
 
     int nThObs;
-    if(mbMonocular)
+    if (mbMonocular)
         nThObs = 2;
     else
-        nThObs = 3; // MODIFICATION_STEREO_IMU here 3
+        nThObs = 3;  // MODIFICATION_STEREO_IMU here 3
     const int cnThObs = nThObs;
 
     int borrar = mlpRecentAddedMapPoints.size();
@@ -385,18 +388,18 @@ void LocalMapping::CreateNewMapPoints()
     // Retrieve neighbor keyframes in covisibility graph
     int nn = 10;
     // For stereo inertial case
-    if(mbMonocular)
-        nn=20;
+    if (mbMonocular)
+        nn = 20;
     vector<KeyFrame*> vpNeighKFs = mpCurrentKeyFrame->GetBestCovisibilityKeyFrames(nn);
 
     if (mbInertial)
     {
         KeyFrame* pKF = mpCurrentKeyFrame;
-        int count=0;
+        int count = 0;
         while (((int)vpNeighKFs.size() <= nn) && (pKF->mPrevKF) && (count++ < nn))
         {
             vector<KeyFrame*>::iterator it = std::find(vpNeighKFs.begin(), vpNeighKFs.end(), pKF->mPrevKF);
-            if(it==vpNeighKFs.end())
+            if (it == vpNeighKFs.end())
                 vpNeighKFs.push_back(pKF->mPrevKF);
             pKF = pKF->mPrevKF;
         }
@@ -404,7 +407,7 @@ void LocalMapping::CreateNewMapPoints()
 
     float th = 0.6f;
 
-    ORBmatcher matcher(th,false);
+    ORBmatcher matcher(th, false);
 
     cv::Mat Rcw1 = mpCurrentKeyFrame->GetRotation();
     cv::Mat Rwc1 = Rcw1.t();
@@ -421,79 +424,81 @@ void LocalMapping::CreateNewMapPoints()
     const float &invfx1 = mpCurrentKeyFrame->invfx;
     const float &invfy1 = mpCurrentKeyFrame->invfy;
 
-    const float ratioFactor = 1.5f*mpCurrentKeyFrame->mfScaleFactor;
+    const float ratioFactor = 1.5f * mpCurrentKeyFrame->mfScaleFactor;
 
     // Search matches with epipolar restriction and triangulate
-    for(size_t i=0; i<vpNeighKFs.size(); i++)
+    int nNewMPs = 0;
+    for (size_t i = 0; i < vpNeighKFs.size(); i++)
     {
-        if(i>0 && CheckNewKeyFrames())// && (mnMatchesInliers>50))
+        if (i > 0 && CheckNewKeyFrames())  // && (mnMatchesInliers>50))
             return;
 
         KeyFrame* pKF2 = vpNeighKFs[i];
 
-        GeometricCamera* pCamera1 = mpCurrentKeyFrame->mpCamera, *pCamera2 = pKF2->mpCamera;
+        GeometricCamera *pCamera1 = mpCurrentKeyFrame->mpCamera, *pCamera2 = pKF2->mpCamera;
 
         // Check first that baseline is not too short
         cv::Mat Ow2 = pKF2->GetCameraCenter();
-        cv::Mat vBaseline = Ow2-Ow1;
+        cv::Mat vBaseline = Ow2 - Ow1;
         const float baseline = cv::norm(vBaseline);
 
-        if(!mbMonocular)
+        if (!mbMonocular)
         {
-            if(baseline<pKF2->mb)
-            continue;
+            if (baseline < pKF2->mb)
+                continue;
         }
         else
         {
             const float medianDepthKF2 = pKF2->ComputeSceneMedianDepth(2);
-            const float ratioBaselineDepth = baseline/medianDepthKF2;
+            const float ratioBaselineDepth = baseline / medianDepthKF2;
 
-            if(ratioBaselineDepth<0.01)
+            if (ratioBaselineDepth < 0.01)
                 continue;
         }
 
         // Compute Fundamental Matrix
-        cv::Mat F12 = ComputeF12(mpCurrentKeyFrame,pKF2);
+        cv::Mat F12 = ComputeF12(mpCurrentKeyFrame, pKF2);
 
         // Search matches that fullfil epipolar constraint
-        vector<pair<size_t,size_t> > vMatchedIndices;
+        vector<pair<size_t, size_t>> vMatchedIndices;
         bool bCoarse = mbInertial &&
-                ((!mpCurrentKeyFrame->GetMap()->GetIniertialBA2() && mpCurrentKeyFrame->GetMap()->GetIniertialBA1())||
-                 mpTracker->mState==Tracking::RECENTLY_LOST);
-        matcher.SearchForTriangulation(mpCurrentKeyFrame,pKF2,F12,vMatchedIndices,false,bCoarse);
+                       ((!mpCurrentKeyFrame->GetMap()->GetIniertialBA2() && mpCurrentKeyFrame->GetMap()->GetIniertialBA1()) ||
+                        mpTracker->mState == Tracking::RECENTLY_LOST);
+        matcher.SearchForTriangulation(mpCurrentKeyFrame, pKF2, F12, vMatchedIndices, false, bCoarse);
 
         cv::Mat Rcw2 = pKF2->GetRotation();
         cv::Mat Rwc2 = Rcw2.t();
         cv::Mat tcw2 = pKF2->GetTranslation();
-        cv::Mat Tcw2(3,4,CV_32F);
-        Rcw2.copyTo(Tcw2.colRange(0,3));
+        cv::Mat Tcw2(3, 4, CV_32F);
+        Rcw2.copyTo(Tcw2.colRange(0, 3));
         tcw2.copyTo(Tcw2.col(3));
 
-        const float &fx2 = pKF2->fx;
-        const float &fy2 = pKF2->fy;
-        const float &cx2 = pKF2->cx;
-        const float &cy2 = pKF2->cy;
-        const float &invfx2 = pKF2->invfx;
-        const float &invfy2 = pKF2->invfy;
+        const float& fx2 = pKF2->fx;
+        const float& fy2 = pKF2->fy;
+        const float& cx2 = pKF2->cx;
+        const float& cy2 = pKF2->cy;
+        const float& invfx2 = pKF2->invfx;
+        const float& invfy2 = pKF2->invfy;
 
         // Triangulate each match
         const int nmatches = vMatchedIndices.size();
-        for(int ikp=0; ikp<nmatches; ikp++)
+        for (int ikp = 0; ikp < nmatches; ikp++)
         {
-            const int &idx1 = vMatchedIndices[ikp].first;
-            const int &idx2 = vMatchedIndices[ikp].second;
+            const int& idx1 = vMatchedIndices[ikp].first;
+            const int& idx2 = vMatchedIndices[ikp].second;
 
-            const cv::KeyPoint &kp1 = (mpCurrentKeyFrame -> NLeft == -1) ? mpCurrentKeyFrame->mvKeysUn[idx1]
-                                                                         : (idx1 < mpCurrentKeyFrame -> NLeft) ? mpCurrentKeyFrame -> mvKeys[idx1]
-                                                                                                               : mpCurrentKeyFrame -> mvKeysRight[idx1 - mpCurrentKeyFrame -> NLeft];
-            const float kp1_ur=mpCurrentKeyFrame->mvuRight[idx1];
-            bool bStereo1 = (!mpCurrentKeyFrame->mpCamera2 && kp1_ur>=0);
-            const bool bRight1 = (mpCurrentKeyFrame -> NLeft == -1 || idx1 < mpCurrentKeyFrame -> NLeft) ? false
-                                                                               : true;
+            const cv::KeyPoint& kp1 = (mpCurrentKeyFrame->NLeft == -1) ?
+                                          mpCurrentKeyFrame->mvKeysUn[idx1] :
+                                      (idx1 < mpCurrentKeyFrame->NLeft) ?
+                                          mpCurrentKeyFrame->mvKeys[idx1] :
+                                          mpCurrentKeyFrame->mvKeysRight[idx1 - mpCurrentKeyFrame->NLeft];
+            const float kp1_ur = mpCurrentKeyFrame->mvuRight[idx1];
+            bool bStereo1 = (!mpCurrentKeyFrame->mpCamera2 && kp1_ur >= 0);
+            const bool bRight1 = (mpCurrentKeyFrame->NLeft == -1 || idx1 < mpCurrentKeyFrame->NLeft) ? false : true;
 
-            const cv::KeyPoint &kp2 = (pKF2 -> NLeft == -1) ? pKF2->mvKeysUn[idx2]
-                                                            : (idx2 < pKF2 -> NLeft) ? pKF2 -> mvKeys[idx2]
-                                                                                     : pKF2 -> mvKeysRight[idx2 - pKF2 -> NLeft];
+            const cv::KeyPoint& kp2 = (pKF2->NLeft == -1)  ? pKF2->mvKeysUn[idx2] :
+                                      (idx2 < pKF2->NLeft) ? pKF2->mvKeys[idx2] :
+                                                             pKF2->mvKeysRight[idx2 - pKF2->NLeft];
 
             const float kp2_ur = pKF2->mvuRight[idx2];
             bool bStereo2 = (!pKF2->mpCamera2 && kp2_ur>=0);
@@ -721,8 +726,11 @@ void LocalMapping::CreateNewMapPoints()
 
             mpAtlas->AddMapPoint(pMP);
             mlpRecentAddedMapPoints.push_back(pMP);
+
+            nNewMPs++;
         }
     }
+    LOGT(nNewMPs << " new MapPoints created..");
 }
 
 
@@ -951,7 +959,7 @@ void LocalMapping::KeyFrameCulling()
         redundant_th = 0.5;
 
     const bool bInitImu = mpAtlas->isImuInitialized();
-    int count=0;
+    int count = 0;
 
     // Compoute last KF from optimizable window:
     unsigned int last_ID;
@@ -974,15 +982,15 @@ void LocalMapping::KeyFrameCulling()
         count++;
         KeyFrame* pKF = *vit;
 
-        if((pKF->mnId==pKF->GetMap()->GetInitKFid()) || pKF->isBad())
+        if ((pKF->mnId == pKF->GetMap()->GetInitKFid()) || pKF->isBad())
             continue;
         const vector<MapPoint*> vpMapPoints = pKF->GetMapPointMatches();
 
         int nObs = 3;
-        const int thObs=nObs;
-        int nRedundantObservations=0;
-        int nMPs=0;
-        for(size_t i=0, iend=vpMapPoints.size(); i<iend; i++)
+        const int thObs = nObs;
+        int nRedundantObservations = 0;
+        int nMPs = 0;
+        for (size_t i = 0, iend = vpMapPoints.size(); i < iend; i++)
         {
             MapPoint* pMP = vpMapPoints[i];
             if(pMP)
@@ -996,7 +1004,7 @@ void LocalMapping::KeyFrameCulling()
                     }
 
                     nMPs++;
-                    if(pMP->Observations()>thObs)
+                    if (pMP->Observations() > thObs)
                     {
                         const int& scaleLevel = (pKF->NLeft == -1) ?
                                                     pKF->mvKeysUn[i].octave :
@@ -1024,14 +1032,14 @@ void LocalMapping::KeyFrameCulling()
                                 }
                             }
 
-                            if(scaleLeveli<=scaleLevel+1)
+                            if (scaleLeveli <= scaleLevel + 1)
                             {
                                 nObs++;
-                                if(nObs>thObs)
+                                if (nObs > thObs)
                                     break;
                             }
                         }
-                        if(nObs>thObs)
+                        if (nObs > thObs)
                         {
                             nRedundantObservations++;
                         }
@@ -1040,7 +1048,7 @@ void LocalMapping::KeyFrameCulling()
             }
         }
 
-        if(nRedundantObservations>redundant_th*nMPs)
+        if (nRedundantObservations > redundant_th * nMPs)
         {
             if (mbInertial)
             {
@@ -1074,12 +1082,25 @@ void LocalMapping::KeyFrameCulling()
                     }
                 }
             }
+            else if (mbOdometry)
+            {
+                KeyFrame* pParent = pKF->GetParent();
+                if (pParent) {
+                    cv::Mat Tcp = pKF->GetPose() * pParent->GetPoseInverse();
+                    double distance = cv::norm(Tcp.rowRange(0, 3).col(3));
+                    if (distance < 0.2) {
+                        pKF->SetBadFlag();
+                    }
+                } else {
+                    pKF->SetBadFlag();
+                }
+            }
             else
             {
                 pKF->SetBadFlag();
             }
         }
-        if((count > 20 && mbAbortBA) || count>100) // MODIFICATION originally 20 for mbabortBA check just 10 keyframes
+        if ((count > 20 && mbAbortBA) || count > 100)  // MODIFICATION originally 20 for mbabortBA check just 10 keyframes
         {
             break;
         }

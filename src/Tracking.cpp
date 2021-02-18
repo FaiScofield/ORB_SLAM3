@@ -38,7 +38,7 @@
 using namespace cv;
 using namespace std;
 
-#define ENABLE_OPTIMAZATION_WITH_PLANAR_CONSTRAINT 0
+#define ENABLE_OPTIMAZATION_WITH_PLANAR_CONSTRAINT 1
 
 namespace ORB_SLAM3
 {
@@ -2565,7 +2565,11 @@ bool Tracking::TrackReferenceKeyFrame()
     // cout << " TrackReferenceKeyFrame mLastFrame.mTcw:  " << mLastFrame.mTcw << endl;
 #if ENABLE_OPTIMAZATION_WITH_PLANAR_CONSTRAINT
     if (mSensor == System::ODOM_MONOCULAR)
+    {
+        LOGT("Pose before PoseOptimizationOnSE2: \n" << mCurrentFrame.GetPoseInverse());
         Optimizer::PoseOptimizationOnSE2(&mCurrentFrame, mpOdomCalib->Tcb);
+        LOGT("Pose after  PoseOptimizationOnSE2: \n" << mCurrentFrame.GetPoseInverse());
+    }
     else
 #endif
         Optimizer::PoseOptimization(&mCurrentFrame);
@@ -3189,12 +3193,13 @@ void Tracking::CreateNewKeyFrame()
     if(mSensor!=System::MONOCULAR && mSensor != System::IMU_MONOCULAR && mSensor!=System::ODOM_MONOCULAR) // TODO check if incluide imu_stereo
     {
         mCurrentFrame.UpdatePoseMatrices();
+        
         // cout << "create new MPs" << endl;
         // We sort points by the measured depth by the stereo/RGBD sensor.
         // We create all those MapPoints whose depth < mThDepth.
         // If there are less than 100 close points we create the 100 closest.
         int maxPoint = 100;
-        if(mSensor == System::IMU_STEREO)
+        if (mSensor == System::IMU_STEREO)
             maxPoint = 100;
 
         vector<pair<float,int> > vDepthIdx;

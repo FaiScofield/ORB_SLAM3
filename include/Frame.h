@@ -88,6 +88,7 @@ public:
     // Set the camera pose. (Imu pose is not modified!)
     void SetPose(cv::Mat Tcw);
     void GetPose(cv::Mat& Tcw);
+    cv::Mat GetPoseInverse() const { return mTcw.inv(); };
 
     // Set IMU velocity
     void SetVelocity(const cv::Mat& Vwb);

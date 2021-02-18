@@ -151,6 +151,7 @@ int main(int argc, char** argv)
         
         cout << "============================================================" << endl;
     }
+    cv::waitKey(0);
 
     // Stop all threads
     SLAM.Shutdown();
