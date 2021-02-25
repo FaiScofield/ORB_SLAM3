@@ -33,6 +33,7 @@
 #include <iostream>
 #include <mutex>
 #include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
 #include <opencv2/features2d/features2d.hpp>
 
 using namespace cv;
@@ -2275,8 +2276,8 @@ void Tracking::MonocularInitializationWithOdometry()
         LOGT("Initialize between " << mInitialFrame.mnId << " and " << mCurrentFrame.mnId << "...");
 
         // Find correspondences
-        ORBmatcher matcher(0.7, true);  // org 0.9
-        int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 100);
+        ORBmatcher matcher(0.9, true);  // org 0.9
+        int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 75);
 
         // Check if there are enough correspondences
         if (nmatches < minKPMatchesForInit)
@@ -2288,6 +2289,80 @@ void Tracking::MonocularInitializationWithOdometry()
             mnInitFailedCnt++;
             return;
         }
+
+        // remove outlier
+        vector<pair<int, int>> vIndexes;
+        vIndexes.reserve(nmatches);
+        vector<Point2f> vFeatures1, vFeatures2;
+        vFeatures1.reserve(nmatches);
+        vFeatures2.reserve(nmatches);
+        for (int i = 0; i < mInitialFrame.N; ++i)
+        {
+            if (mvIniMatches[i] >= 0)
+            {
+                vFeatures1.push_back(mInitialFrame.mvKeysUn[i].pt);
+                vFeatures2.push_back(mCurrentFrame.mvKeysUn[mvIniMatches[i]].pt);
+                vIndexes.emplace_back(i, mvIniMatches[i]);
+            }
+        }
+        
+        vector<uchar> inliers;
+        Mat A12 = estimateAffinePartial2D(vFeatures1, vFeatures2, inliers, RANSAC);
+        if (!A12.empty() && inliers.empty())
+        {
+            for (size_t i = 0; i < inliers.size(); ++i)
+            {
+                if (!inliers[i])
+                {
+                    mvIniMatches[vIndexes[i].first] = -1;
+                    nmatches--;
+                }
+            }
+
+            // update PrevMatched KPs through Affine matrix
+            KeyPoint::convert(mInitialFrame.mvKeysUn, mvbPrevMatched);
+            transform(mvbPrevMatched, mvbPrevMatched, A12);
+        }
+
+    #if 1
+        // show KP matches
+        {
+            Mat imgShow;
+            hconcat(mInitialFrame.imgLeft, mCurrentFrame.imgLeft, imgShow);
+            cvtColor(imgShow, imgShow, COLOR_GRAY2BGR);
+            const Point2f offset(mInitialFrame.imgLeft.cols, 0);
+            for (int i = 0; i < mInitialFrame.N; ++i)
+            {
+                Point2f pt1 = mInitialFrame.mvKeysUn[i].pt;
+                Point2f pt2 = mCurrentFrame.mvKeysUn[i].pt + offset;
+                circle(imgShow, pt1, 1, Scalar(0,0,255), 1, LINE_AA);
+                circle(imgShow, pt2, 1, Scalar(0,0,255), 1, LINE_AA);
+
+                if (mvIniMatches[i] < 0)
+                    continue;
+                
+                pt1 = mInitialFrame.mvKeysUn[i].pt;
+                pt2 = mCurrentFrame.mvKeysUn[mvIniMatches[i]].pt + offset;
+                circle(imgShow, pt1, 2, Scalar(0,0,255), 2, LINE_AA);
+                circle(imgShow, pt2, 2, Scalar(0,0,255), 2, LINE_AA);
+                line(imgShow, pt1, pt2, Scalar(255,0,0), 1, LINE_AA);
+            }
+            for (size_t i = 0; i < inliers.size(); ++i)
+            {
+                if (inliers[i])
+                {
+                    Point2f pt1 = mInitialFrame.mvKeysUn[vIndexes[i].first].pt;
+                    Point2f pt2 = mCurrentFrame.mvKeysUn[vIndexes[i].second].pt + offset;
+                    line(imgShow, pt1, pt2, Scalar(0,255,0), 1, LINE_AA);
+                }
+            }
+            imshow("KP Matches", imgShow);
+            waitKey(10);
+            char fileName[256];
+            snprintf(fileName, 256, "/home/vance/output/0225-initial_kp_match/match_%ld_to_%ld.jpg", mInitialFrame.mnId, mCurrentFrame.mnId);
+            imwrite(fileName, imgShow);
+        }
+    #endif
 
         cv::Mat Rcw;                       // Rc2c1
         cv::Mat tcw;                       // tc2c1
@@ -2402,7 +2477,7 @@ void Tracking::CreateInitialMapMonocular()
         invMedianDepth = 1.0f / medianDepth;
     }
 
-    if(medianDepth<0 || pKFcur->TrackedMapPoints(1)<50) // TODO Check, originally 100 tracks
+    if (medianDepth < 0 || pKFcur->TrackedMapPoints(1) < 50)  // TODO Check, originally 100 tracks
     {
         Verbose::PrintMess("Wrong initialization, reseting...", Verbose::VERBOSITY_NORMAL);
         mpSystem->ResetActiveMap();

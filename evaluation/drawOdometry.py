@@ -34,7 +34,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 # Requirements: 
-# sudo apt-get install python-argparse
+# sudo apt-get install libpython2.7-stdlib
 
 """
 This script computes the absolute trajectory error from the ground truth

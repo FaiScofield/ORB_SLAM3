@@ -100,6 +100,8 @@ Frame::Frame(const Frame& frame) :
     mmMatchedInImage = frame.mmMatchedInImage;
 
     mOdom = frame.mOdom;
+
+    imgLeft = frame.imgLeft;
 }
 
 // Constructor for stereo cameras.
@@ -338,6 +340,7 @@ Frame::Frame(const cv::Mat& imGray, const double& timeStamp, ORBextractor* extra
         return;
 
     imgLeft = imGray.clone();
+    // imgLeft = imGray;
 
     UndistortKeyPoints();
 
@@ -441,6 +444,7 @@ Frame::Frame(const cv::Mat& imGray, const cv::Mat& mask, const double& timeStamp
         return;
 
     imgLeft = imGray.clone();
+    // imgLeft = imGray;
 
     UndistortKeyPoints();
 
@@ -544,6 +548,7 @@ Frame::Frame(const cv::Mat& imGray, const cv::Mat& mask, double timeStamp, ORBex
         return;
 
     imgLeft = imGray.clone();
+    // imgLeft = imGray;
 
     UndistortKeyPoints();
 

@@ -724,6 +724,7 @@ int ORBmatcher::SearchForInitialization(Frame& F1, Frame& F2, vector<cv::Point2f
 
         if (bestDist <= TH_LOW) {
             if (bestDist < (float)bestDist2 * mfNNratio) {
+            #if 1   // origin
                 if (vnMatches21[bestIdx2] >= 0) {
                     vnMatches12[vnMatches21[bestIdx2]] = -1;
                     nmatches--;
@@ -732,7 +733,24 @@ int ORBmatcher::SearchForInitialization(Frame& F1, Frame& F2, vector<cv::Point2f
                 vnMatches21[bestIdx2] = i1;
                 vMatchedDistance[bestIdx2] = bestDist;
                 nmatches++;
+            #else   // improve, no better then before
+                if (vnMatches21[bestIdx2] < 0) {
+                    vnMatches12[i1] = bestIdx2;
+                    vnMatches21[bestIdx2] = i1;
+                    vMatchedDistance[bestIdx2] = bestDist;
+                    nmatches++;
+                } else if (bestDist < vMatchedDistance[bestIdx2]) {
+                    assert(vnMatches12[vnMatches21[bestIdx2]] == bestIdx2);
+                    vnMatches12[vnMatches21[bestIdx2]] = -1;
 
+                    vnMatches12[i1] = bestIdx2;
+                    vnMatches21[bestIdx2] = i1;
+                    vMatchedDistance[bestIdx2] = bestDist;
+                } else {
+                    vnMatches12[i1] = -1;
+                    continue;
+                }
+            #endif
                 if (mbCheckOrientation) {
                     float rot = F1.mvKeysUn[i1].angle - F2.mvKeysUn[bestIdx2].angle;
                     if (rot < 0.0)
