@@ -43,6 +43,7 @@ class KeyFrame;
 class ConstraintPoseImu;
 class GeometricCamera;
 class ORBextractor;
+class LINEextractor;
 
 class Frame
 {
@@ -81,6 +82,16 @@ public:
 
     // Extract ORB on the image. 0 for left image and 1 for right image.
     void ExtractORB(int flag, const cv::Mat& im, const int x0, const int x1);
+
+    // extract line feature, 自己添加的
+    void setLineExtractor(LINEextractor* pExtractor) { mpLSDextractorLeft = pExtractor; }
+    void ExtractLSD(const cv::Mat &im, const cv::Mat &mask);
+
+    // 计算线特征端点的3D坐标，自己添加的
+    void ComputeLine3D(Frame &frame1, Frame &frame2);
+
+    // 自己添加的，线特征描述子MAD
+    void lineDescriptorMAD(std::vector<std::vector<cv::DMatch>> matches, double &nn_mad, double &nn12_mad) const;
 
     // Compute Bag of Words representation.
     void ComputeBoW();
@@ -154,6 +165,8 @@ public:
     // Feature extractor. The right is used only in the stereo case.
     ORBextractor *mpORBextractorLeft, *mpORBextractorRight;
 
+    LINEextractor* mpLSDextractorLeft;
+
     // Frame timestamp.
     double mTimeStamp;
 
@@ -178,7 +191,8 @@ public:
     float mThDepth;
 
     // Number of KeyPoints.
-    int N;
+    int N;	//点特征的个数
+    int NL; //特征线的个数
 
     // Vector of keypoints (original for visualization) and undistorted (actually used by the system).
     // In the stereo case, mvKeysUn is redundant as images must be rectified.
@@ -203,6 +217,14 @@ public:
     // Flag to identify outlier associations.
     std::vector<bool> mvbOutlier;
     int mnCloseMPs;
+
+    // 自己添加的，特征线vector，特征线的描述子
+    cv::Mat mLdesc;
+    std::vector<cv::line_descriptor::KeyLine> mvKeylinesUn;
+    std::vector<Eigen::Vector3d> mvKeyLineFunctions;    //特征线段所在直线的系数
+    // 和KeyPoint类似，自己添加，标识特征线段是否属于外点
+    std::vector<bool> mvbLineOutlier;
+    std::vector<MapLine*> mvpMapLines;  //mvpMapLines与keylines相关联
 
     // Keypoints are assigned to cells in a grid to reduce matching complexity when projecting MapPoints.
     static float mfGridElementWidthInv;

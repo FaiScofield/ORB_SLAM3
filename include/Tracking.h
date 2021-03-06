@@ -37,6 +37,7 @@
 // #include "Odometry.h"
 #include "ORBVocabulary.h"
 #include "ORBextractor.h"
+#include "LineExtractor.h"
 #include "System.h"
 #include "Viewer.h"
 
@@ -83,6 +84,7 @@ public:
     void SetLoopClosing(LoopClosing* pLoopClosing);
     void SetViewer(Viewer* pViewer);
     void SetStepByStep(bool bSet);
+    void SetWithLines(bool flag) { mbWithLines = flag; }
 
     // Load new settings
     // The focal lenght should be similar or scale prediction will fail when projecting points
@@ -128,15 +130,24 @@ public:
     // Current Frame
     Frame mCurrentFrame;
     Frame mLastFrame;
-
+	Frame mInitialFrame;
+	
     cv::Mat mImGray;
 
     // Initialization Variables (Monocular)
+    ////////////////////////////////////////////////////////////////////////////////////////
+    // Points
     std::vector<int> mvIniLastMatches;
     std::vector<int> mvIniMatches;
     std::vector<cv::Point2f> mvbPrevMatched;
     std::vector<cv::Point3f> mvIniP3D;
-    Frame mInitialFrame;
+	
+    ///////////////////////////////////////////////////////////////////////////////////////
+    // Lines
+    std::vector<int> mvIniLastLineMatches;
+    vector<int> mvIniLineMatches;
+    vector<cv::Point3f> mvLineS3D;   //初始化时线段起始点的3D位置
+    vector<cv::Point3f> mvLineE3D;   //初始化时线段终止点的3D位置
 
     // Lists used to recover the full camera trajectory at the end of the execution.
     // Basically we store the reference keyframe for each frame and its relative transformation
@@ -202,11 +213,13 @@ protected:
 
     void UpdateLocalMap();
     void UpdateLocalPoints();
+    void UpdateLocalLines();
     void UpdateLocalKeyFrames();
 
     bool TrackLocalMap();
     bool TrackLocalMap_old();
     void SearchLocalPoints();
+    void SearchLocalLines();
 
     bool NeedNewKeyFrame();
     void CreateNewKeyFrame();
@@ -226,6 +239,9 @@ protected:
     bool TriangulateWithOdometry(const std::vector<cv::KeyPoint>& vKeys1, const std::vector<cv::KeyPoint>& vKeys2, 
                                  const std::vector<int>& vMatches12, cv::Mat& R21, cv::Mat& t21,
                                  std::vector<cv::Point3f>& vP3D, std::vector<bool>& vbTriangulated);
+    bool TriangulateLines(const std::vector<cv::KeyPoint>& vKL1, const std::vector<cv::KeyPoint>& vKL2,
+                          const std::vector<int>& vMatches12, cv::Mat& R21, cv::Mat& t21,
+                          std::vector<cv::Point3f>& vP3dS, std::vector<cv::Point3f>& vP3dE, std::vector<bool>& vbTriangulated);
 
     bool mbMapUpdated;
 
@@ -264,6 +280,9 @@ protected:
     ORBextractor* mpORBextractorLeft, *mpORBextractorRight;
     ORBextractor* mpIniORBextractor;
 
+    // Line
+    LINEextractor* mpLSDextractorLeft;
+
     //BoW
     ORBVocabulary* mpORBVocabulary;
     KeyFrameDatabase* mpKeyFrameDB;
@@ -276,6 +295,7 @@ protected:
     KeyFrame* mpReferenceKF;
     std::vector<KeyFrame*> mvpLocalKeyFrames;
     std::vector<MapPoint*> mvpLocalMapPoints;
+    std::vector<MapLine*> mvpLocalMapLines;
     
     // System
     System* mpSystem;
@@ -313,6 +333,7 @@ protected:
 
     //Current matches in frame
     int mnMatchesInliers;
+    int mnLineMatchesInliers;
 
     //Last Frame, KeyFrame and Relocalisation Info
     KeyFrame* mpLastKeyFrame;
@@ -333,8 +354,9 @@ protected:
 
     //Color order (true RGB, false BGR, ignored if grayscale)
     bool mbRGB;
+    bool mbWithLines;
 
-    list<MapPoint*> mlpTemporalPoints;
+    std::list<MapPoint*> mlpTemporalPoints;
 
     //int nMapChangeIndex;
 

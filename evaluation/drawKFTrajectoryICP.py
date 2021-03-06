@@ -11,8 +11,10 @@ def solvICP(odomVI, odomRaw):
     center_e = np.array([[0.], [0.]])
     center_g = np.array([[0.], [0.]])
     for i in range(len(odomVI)):
-        center_e = center_e + odomVI[i]
-        center_g = center_g + odomRaw[i]
+        pe = np.array([[odomVI[i][0]], [odomVI[i][1]]])
+        pg = np.array([[odomRaw[i][0]], [odomRaw[i][1]]])
+        center_e = center_e + pe
+        center_g = center_g + pg
 
     # print 'tatal sum:', center_e, center_g
     # line vector
@@ -22,8 +24,8 @@ def solvICP(odomVI, odomRaw):
 
     W = np.mat(np.zeros((2, 2)))
     for i in range(len(odomVI)):
-        de = odomVI[i] - center_e
-        dg = odomRaw[i] - center_g
+        de = np.array([[odomVI[i][0]], [odomVI[i][1]]]) - center_e
+        dg = np.array([[odomRaw[i][0]], [odomRaw[i][1]]]) - center_g
         W = W + np.dot(dg, np.transpose(de))
 
     # print 'W = ', W
@@ -123,7 +125,7 @@ if __name__ == '__main__':
     matches = associate(dataVI, dataOdom, 0, 0.02)
     print 'Get associate matches size: ', len(matches)
 
-    viom = [[float(value) for value in dataVI[a][0:2]] for a,b in matches]
+    viom = [[float(value) * 1.15 for value in dataVI[a][0:2]] for a,b in matches]
     odom = [[float(value) for value in dataOdom[b][0:2]] for a,b in matches]
     x0 = odom[0][0]
     y0 = odom[0][1]
@@ -136,31 +138,58 @@ if __name__ == '__main__':
     odom[0][0] = odom[0][1] = 0
 
     # Get odomRaw with VI KF pose
-    # R, t = solvICP(viom, odom)
-    # print('R21:', R)
-    # print('t21:', t)
-    # print('yaw:', np.arccos(R[0][0]))
+    R, t = solvICP(viom, odom)
+    print('R12:', R)
+    print('t12:', t)
+    print('yaw:', np.arccos(R[0][0]))
     # R12 = np.linalg.inv(R)
     # print('R12:', R12)
     # print('yaw12:', np.arccos(R12[0][0]))
+    # theta = 0.9333
+    # R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+    # print('new R:', R)
 
     x1 = []
     y1 = []
     x2 = []
     y2 = []
     for i in range(len(viom)):
-        x1.append(float(viom[i][0]))
-        y1.append(float(viom[i][1]))
+        # viom[i] = np.dot(R, viom[i]) + t
+        p1 = np.array([[viom[i][0]], [viom[i][1]]])
+        p2 = (R * p1 + t).tolist()
+        # p2 = (R * p1 * 1.15).tolist()
+        # x1.append(float(viom[i][0]))
+        # y1.append(float(viom[i][1]))
+        x1.append(p2[0][0])
+        y1.append(p2[1][0])
     for i in range(len(odom)):
+        # odom[i] = np.dot(R, np.array(odom[i])) + t
+
         x2.append(float(odom[i][0]))
         y2.append(float(odom[i][1]))
 
-    plt.plot(x1, y1, color='red', linewidth=1.0, linestyle = '-', label='Trajectory_VI')
-    plt.plot(x1[0], y1[0], 'ro', label='SP_VI')
-    plt.plot(x2, y2, color='black', linewidth=2.0, linestyle = '-', label='Trajectory_Odom')
-    plt.plot(x2[0], y2[0], 'ko', label='SP_Odom')
+    # compute errors
+    sum_error = 0
+    for i in range(len(viom)):
+        e = np.sqrt((x1[i] - x2[i]) * (x1[i] - x2[i]) + (y1[i] - y2[i]) * (y1[i] - y2[i]))
+        sum_error = sum_error + e
+    print('ave error:', sum_error / len(viom))
+
+    x1[0] = 0
+    y1[0] = 0
+
+    plt.plot(x1, y1, color='red', linewidth=1.0, linestyle = '-', label='Trajectory_OURS')
+    # plt.plot(x1[0], y1[0], 'ro', label='Start_VI')
+    plt.plot(x2, y2, color='black', linewidth=1.0, linestyle = '-', label='Trajectory_GT')
+    # plt.plot(x2[0], y2[0], 'ko', label='SP_GT')
+    plt.plot(x2[0], y2[0], 'ko')
+
+    x3 = [0, 0.1, 0.1, 0.2, 0.2, 0.3, 0.33]
+    y3 = [0, -0.1,-0.15, -0.18, -0.2, -0.21, -0.22]
+    plt.plot(x3, y3, color='blue', linewidth=1.0, linestyle = '-', label='Trajectory_ORB')
     plt.legend(loc='best')
     # plt.xlim(-1, 2)
     # plt.ylim(-1, 2)
     plt.axis('equal')
     plt.show()
+

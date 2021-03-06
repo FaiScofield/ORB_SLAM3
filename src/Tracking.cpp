@@ -36,6 +36,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/features2d/features2d.hpp>
 
+using namespace cv::line_descriptor;
 using namespace cv;
 using namespace std;
 
@@ -797,7 +798,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
 
     if (mSensor == System::MONOCULAR || mSensor == System::IMU_MONOCULAR || mSensor == System::ODOM_MONOCULAR)
     {
-        mpIniORBextractor = new ORBextractor(5 * nFeatures, fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
+        mpIniORBextractor = new ORBextractor(2 * nFeatures, fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
         mpIniORBextractor->SetFeatureType(nFeatureType);
     }
 
@@ -808,6 +809,13 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     cout << "- Initial Fast Threshold: " << fIniThFAST << endl;
     cout << "- Minimum Fast Threshold: " << fMinThFAST << endl;
     cout << "- Feature Type (0-ORB, 1-GFTT, 2-SURF): " << nFeatureType << endl;
+
+    // Lines
+    int nFeaturesLine = fSettings["LINEextractor.nFeatures"];
+    float fScaleFactorLine = fSettings["LINEextractor.scaleFactor"];
+    int nLevelsLine = fSettings["LINEextractor.nLevels"];
+    int nMinLength = fSettings["LINEextractor.min_line_length"];
+    mpLSDextractorLeft = new LINEextractor(nLevelsLine, fScaleFactorLine, nFeaturesLine, nMinLength);
 
     return true;
 }
@@ -1175,6 +1183,10 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp,
             mCurrentFrame = Frame(mImGray,cv::Mat(),timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpOdomCalib);
         mCurrentFrame.mOdom = mlQueueOdomData.back();   // TODO @Vance
     }
+
+    // set line extractor
+    if (mbWithLines)
+        mCurrentFrame.setLineExtractor(mpLSDextractorLeft);
 
     if (mState == NO_IMAGES_YET)
         t0 = timestamp;
@@ -2255,6 +2267,8 @@ void Tracking::MonocularInitializationWithOdometry()
             mpInitializer = new Initializer(mCurrentFrame, 1.0, 200);
 
             fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
+            fill(mvIniLineMatches.begin(), mvIniLineMatches.end(), -1);
+            mvIniLastLineMatches = vector<int>(mCurrentFrame.mvKeys.size(), -1);
 
             mInitDeltaTrans = (mCurrentFrame.mOdom - mInitialFrame.mOdom).normSquare();
 
@@ -2277,7 +2291,14 @@ void Tracking::MonocularInitializationWithOdometry()
 
         // Find correspondences
         ORBmatcher matcher(0.9, true);  // org 0.9
-        int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 75);
+        int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 100); // org 100
+
+        int lineMatches = 0;
+        if (mbWithLines)
+        {
+            LSDmatcher lmatcher;
+            lineMatches = lmatcher.SearchDouble(mLastFrame, mCurrentFrame, mvIniLineMatches);
+        }
 
         // Check if there are enough correspondences
         if (nmatches < minKPMatchesForInit)
@@ -2286,11 +2307,13 @@ void Tracking::MonocularInitializationWithOdometry()
             delete mpInitializer;
             mpInitializer = static_cast<Initializer*>(NULL);
             fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
+            fill(mvIniLineMatches.begin(), mvIniLineMatches.end(), -1);
+            // mvIniLastLineMatches = vector<int>(mCurrentFrame.mvKeys.size(), -1);
             mnInitFailedCnt++;
             return;
         }
 
-        // remove outlier
+        // remove KP outlier
         vector<pair<int, int>> vIndexes;
         vIndexes.reserve(nmatches);
         vector<Point2f> vFeatures1, vFeatures2;
@@ -2308,7 +2331,7 @@ void Tracking::MonocularInitializationWithOdometry()
         
         vector<uchar> inliers;
         Mat A12 = estimateAffinePartial2D(vFeatures1, vFeatures2, inliers, RANSAC);
-        if (!A12.empty() && inliers.empty())
+        if (!A12.empty() && !inliers.empty())
         {
             for (size_t i = 0; i < inliers.size(); ++i)
             {
@@ -2359,7 +2382,45 @@ void Tracking::MonocularInitializationWithOdometry()
             imshow("KP Matches", imgShow);
             waitKey(10);
             char fileName[256];
-            snprintf(fileName, 256, "/home/vance/output/0225-initial_kp_match/match_%ld_to_%ld.jpg", mInitialFrame.mnId, mCurrentFrame.mnId);
+            snprintf(fileName, 256, "/home/vance/output/KPmatch_%ld_to_%ld.jpg", mInitialFrame.mnId, mCurrentFrame.mnId);
+            imwrite(fileName, imgShow);
+        }
+
+        // show KL matches
+        if (mbWithLines)
+        {
+            Mat tmp1, tmp2, imgShow;
+            cvtColor(mInitialFrame.imgLeft, tmp1, COLOR_GRAY2BGR);
+            cvtColor(mCurrentFrame.imgLeft, tmp2, COLOR_GRAY2BGR);
+
+            // draw line and mark index
+            drawKeylines(tmp1, mInitialFrame.mvKeylinesUn, tmp1, Scalar(200, 0, 0));
+            drawKeylines(tmp2, mCurrentFrame.mvKeylinesUn, tmp2, Scalar(200, 0, 0));
+            // for (int i = 0; i < mInitialFrame.NL; ++i)
+            for (const KeyLine& line : mInitialFrame.mvKeylinesUn)
+                putText(tmp1, to_string(line.class_id), line.pt, FONT_HERSHEY_COMPLEX, 0.4, Scalar(200, 0, 0), 1, 8, 0);
+            for (const KeyLine& line : mCurrentFrame.mvKeylinesUn)
+                putText(tmp2, to_string(line.class_id), line.pt, FONT_HERSHEY_COMPLEX, 0.4, Scalar(200, 0, 0), 1, 8, 0);
+
+            hconcat(tmp1, tmp2, imgShow);
+            const Point2f offset(mInitialFrame.imgLeft.cols, 0);
+
+            for (int i = 0; i < mInitialFrame.NL; ++i)
+            {
+                const int j = mvIniLineMatches[i];
+                if (j < 0)
+                    continue;
+
+                const KeyLine& line1 = mInitialFrame.mvKeylinesUn[i];
+                const KeyLine& line2 = mCurrentFrame.mvKeylinesUn[j];
+                const Point2f& pl1c = line1.pt;
+                const Point2f& pl2c = line1.pt;
+                line(imgShow, pl1c, pl2c+offset, Scalar(0,255,0), 1, LINE_AA);
+            }
+            imshow("KL Matches", imgShow);
+            waitKey(10);
+            char fileName[256];
+            snprintf(fileName, 256, "/home/vance/output/KLmatch_%ld_to_%ld.jpg", mInitialFrame.mnId, mCurrentFrame.mnId);
             imwrite(fileName, imgShow);
         }
     #endif
@@ -2375,16 +2436,29 @@ void Tracking::MonocularInitializationWithOdometry()
         tcw = Tc2c1.rowRange(0, 3).col(3);
         bool ok = TriangulateWithOdometry(mInitialFrame.mvKeysUn, mCurrentFrame.mvKeysUn, mvIniMatches, Rcw, tcw,
                                           mvIniP3D, vbTriangulated);
+        bool ok2 = false;
+        if (mbWithLines)
+            ok2 = TriangulateLines(mvIniLineMatches, mK, Rcw, tcw, mvLineS3D, mvLineE3D, mvbLineTriangulated);
     #else
         bool ok = mpCamera->ReconstructWithTwoViews(mInitialFrame.mvKeysUn, mCurrentFrame.mvKeysUn, mvIniMatches, Rcw,
                                                     tcw, mvIniP3D, vbTriangulated);
     #endif
 
-        if (ok) {
+        if (ok)
+        {
             for (size_t i = 0, iend = mvIniMatches.size(); i < iend; i++) {
                 if (mvIniMatches[i] >= 0 && !vbTriangulated[i]) {
                     mvIniMatches[i] = -1;
                     nmatches--;
+                }
+            }
+
+            if (mbWithLines && ok2) {
+                for (size_t i = 0, iend = mvIniLineMatches.size(); i < iend; i++) {
+                    if (mvIniLineMatches[i] >= 0 && !mvbLineTriangulated[i]) {
+                        mvIniLineMatches[i] = -1;
+                        lineMatches--;
+                    }
                 }
             }
 
@@ -2399,7 +2473,12 @@ void Tracking::MonocularInitializationWithOdometry()
             CreateInitialMapMonocular();
         }
         mnInitFailedCnt = mState == OK ? 0 : mnInitFailedCnt + 1;
+        if (mState == OK) {
+            destroyWindow("KP Matches");
+            destroyWindow("KL Matches");
+        }
     }
+
 }
 
 void Tracking::CreateInitialMapMonocular()
@@ -2473,11 +2552,24 @@ void Tracking::CreateInitialMapMonocular()
         invMedianDepth = 4.0f / medianDepth;  // 4.0f
     } else if (mSensor == System::ODOM_MONOCULAR) {
         invMedianDepth = 1.0f;
+    #if 1
+        // Tb1b2 = Tbc * Tc1w * Twc2 * Tcb
+        cv::Mat Tb1b2 = mpOdomCalib->Tbc * pKFini->GetPose() * pKFcur->GetPoseInverse() * mpOdomCalib->Tcb;
+        ODOM::Point Tb1b2_se2_vo;
+        Tb1b2_se2_vo.fromCvSE3(Tb1b2);
+        cout << "Tb1b2 from vo   = " << Tb1b2_se2_vo << endl;
+
+        ODOM::Point Tb1b2_se2_odo = (pKFini->mOdom.inv() + pKFcur->mOdom);
+        cout << "Tb1b2 from odom = " << Tb1b2_se2_odo << endl;
+
+        invMedianDepth = sqrt(Tb1b2_se2_odo.normSquare() / Tb1b2_se2_vo.normSquare());
+        cout << "medianDepth = " << medianDepth << ", invMedianDepth = " << invMedianDepth << endl;
+    #endif
     } else {
         invMedianDepth = 1.0f / medianDepth;
     }
 
-    if (medianDepth < 0 || pKFcur->TrackedMapPoints(1) < 50)  // TODO Check, originally 100 tracks
+    if (medianDepth < 0 || pKFcur->TrackedMapPoints(1) < 10)  // TODO: Check, originally 100 tracks
     {
         Verbose::PrintMess("Wrong initialization, reseting...", Verbose::VERBOSITY_NORMAL);
         mpSystem->ResetActiveMap();
@@ -2485,6 +2577,8 @@ void Tracking::CreateInitialMapMonocular()
     }
 
     // Scale initial baseline
+
+
     cv::Mat Tc2w = pKFcur->GetPose();
     Tc2w.col(3).rowRange(0,3) = Tc2w.col(3).rowRange(0,3)*invMedianDepth;
     pKFcur->SetPose(Tc2w);
@@ -4620,6 +4714,146 @@ bool Tracking::TriangulateWithOdometry(const std::vector<cv::KeyPoint>& vKeys1, 
     // bool ok2 = nGoodParallaxMPs > 10;
 
     return ok;
+}
+
+bool Tracking::TriangulateLines(const vector<cv::KeyPoint>& vKL1, const vector<cv::KeyPoint>& vKL2,
+                                const vector<int>& vMatches12, cv::Mat& R21, cv::Mat& t21, vector<cv::Point3f>& vP3dS,
+                                vector<cv::Point3f>& vP3dE, vector<bool>& vbTriangulated)
+{
+    const int numKLs = vKL1.size();
+    vP3dS.resize(numKLs);
+    vP3dE.resize(numKLs);
+    vbTriangulated.resize(numKLs);
+
+    cv::Mat P1(3, 4, CV_32F);
+    mK.copyTo(P1.rowRange(0,3).colRange(0,3));
+    cv::Mat O1 = cv::Mat::zeros(3,1,CV_32F);
+    
+    cv::Mat P2(3, 4, CV_32F);
+    R21.copyTo(P2.rowRange(0,3).colRange(0,3));
+    t21.copyTo(P2.rowRange(0,3).col(3));
+    P2 = mK * P2;
+    cv::Mat O2 = -R21.t() * t21;
+
+    vector<double> errorC1, errorC2;
+    errorC1.resize(vMatches12.size(), -1.0);
+    errorC2.resize(vMatches12.size(), -1.0);
+
+    for (size_t i = 0, iend = vMatches12.size(); i < iend; i++)
+    {
+        // 匹配的两条特征线
+        const int j = vMatches12[i];
+        if (j < 0)
+            continue;
+
+        const KeyLine& kl1 = vKL1[i];
+        const KeyLine& kl2 = vKL2[j];
+        cv::Mat L3dSC1;                           //线特征的3D起始点在camera1下的坐标
+        cv::Mat L3dEC1;                           //线特征的3D终止点在camera1下的坐标
+        Vector3d& klf1 = mvKeyLineFunctions1[i];  //第一帧的特征线段所在直线系数
+        Vector3d& klf2 = mvKeyLineFunctions2[j];  //第二帧的特征线段所在直线系数
+
+        // 利用三角法恢复线段的两个三维端点，这里类比点特征的三角化函数
+        cv::Mat lineVector2 = (Mat_<float>(2, 1) << -klf2(1), klf2(0));
+        cv::Mat _ray1Start = (Mat_<float>(3, 1) << kl1.startPointX, kl1.startPointY, 1);
+        cv::Mat _ray1End = (Mat_<float>(3, 1) << kl1.endPointX, kl1.endPointY, 1);
+        cv::Mat t21x = SkewSymmetricMatrix(t21);
+        cv::Mat F21 = (K.t()).inv() * t21x * R21 * K.inv();
+        cv::Mat Th1 = F21 * _ray1Start;
+        cv::Mat Th1_ = (Mat_<float>(2, 1) << -Th1.at<float>(1, 0), Th1.at<float>(0, 0));
+        float Result1 = lineVector2.dot(Th1_) / (norm(lineVector2) * norm(Th1_));
+        cv::Mat Th2 = F21 * _ray1End;
+        cv::Mat Th2_ = (Mat_<float>(2, 1) << -Th2.at<float>(1, 0), Th2.at<float>(0, 0));
+        float Result2 = lineVector2.dot(Th2_) / (norm(lineVector2) * norm(Th2_));
+
+
+        if (abs(Result1) > 0.98 || abs(Result2) > 0.98)
+            continue;
+
+        LineTriangulate(kl1, kl2, P1, P2, klf1, klf2, L3dSC1, L3dEC1);
+
+        if (!isfinite(L3dSC1.at<float>(0)) || !isfinite(L3dSC1.at<float>(1)) || !isfinite(L3dSC1.at<float>(2)) ||
+            !isfinite(L3dEC1.at<float>(0)) || !isfinite(L3dEC1.at<float>(1)) || !isfinite(L3dEC1.at<float>(2)))
+        {
+            continue;
+        }
+
+        // 判断端点到光心的夹角
+        cv::Mat normal1 = L3dSC1 - O1;
+        float dist1 = cv::norm(normal1);
+
+        cv::Mat normal2 = L3dSC1 - O2;
+        float dist2 = cv::norm(normal2);
+
+        float cosParallax1 = normal1.dot(normal2) / (dist1 * dist2);
+
+        normal1 = L3dEC1 - O1;
+        dist1 = cv::norm(normal1);
+
+        normal2 = L3dEC1 - O2;
+        dist2 = cv::norm(normal2);
+
+        float cosParallax2 = normal1.dot(normal2) / (dist1 * dist2);
+
+        if (cosParallax1 >= 0.99998 || cosParallax2 >= 0.99998)
+            continue;
+
+        vLineS3D[index] = cv::Point3f(L3dSC1.at<float>(0), L3dSC1.at<float>(1), L3dSC1.at<float>(2));
+        vLineE3D[index] = cv::Point3f(L3dEC1.at<float>(0), L3dEC1.at<float>(1), L3dEC1.at<float>(2));
+
+        // 线特征的两个端点在camera2下的坐标
+        cv::Mat L3dSC2 = R21 * L3dSC1 + t21;
+        cv::Mat L3dEC2 = R21 * L3dEC1 + t21;
+
+        //***********根据线特征的重投影误差****************
+        // step1: 计算起始点和终止点在第一帧上的重投影误差
+        // 1.1：计算线段所在的直线方程
+        Vector3d l_obs1 = mvKeyLineFunctions1[vLineMatches[i].first];
+
+        // 1.2:计算起始点和终止点的3D坐标反投影至图像平面上的坐标
+        float im1Startx, im1Starty;
+        float invZ1start = 1.0 / L3dSC1.at<float>(2);
+        im1Startx = fx * L3dSC1.at<float>(0) * invZ1start + cx;
+        im1Starty = fy * L3dSC1.at<float>(1) * invZ1start + cy;
+
+        float im1Endx, im1Endy;
+        float invZ1end = 1.0 / L3dEC1.at<float>(2);
+        im1Endx = fx * L3dEC1.at<float>(0) * invZ1end + cx;
+        im1Endy = fx * L3dEC1.at<float>(1) * invZ1end + cy;
+
+        // 1.3：计算起始点和终止点的2D反投影坐标到直线的距离，误差为距离之和
+        Vector2d err_l1;
+        err_l1(0) = l_obs1(0) * im1Startx + l_obs1(1) * im1Starty + l_obs1(2);
+        err_l1(1) = l_obs1(0) * im1Endx + l_obs1(1) * im1Endy + l_obs1(2);
+        double err1 = err_l1.norm();
+        errorC1[i] = err1;
+
+        // step2：计算起始点和终止点在第二帧上的重投影误差
+        // 2.1：计算第二帧的线段所在直线的方程
+        Vector3d l_obs2 = mvKeyLineFunctions2[vLineMatches[i].second];
+
+        // 2.2：计算起始点和终止点的3D坐标反投影至图像平面上的坐标
+        float im2Startx, im2Starty;
+        float invZ2start = 1.0 / L3dSC2.at<float>(2);
+        im2Startx = fx * L3dSC2.at<float>(0) * invZ2start + cx;
+        im2Starty = fy * L3dSC2.at<float>(1) * invZ2start + cy;
+
+        float im2Endx, im2Endy;
+        float invZ2end = 1.0 / L3dEC2.at<float>(2);
+        im2Endx = fx * L3dEC2.at<float>(0) * invZ2end + cx;
+        im2Endy = fy * L3dEC2.at<float>(1) * invZ2end + cy;
+
+        // 2.3：计算起始点和终止点的2D反投影坐标到直线的距离，误差为距离之和
+        Vector2d err_l2;
+        err_l2(0) = l_obs2(0) * im2Startx + l_obs2(1) * im2Starty + l_obs2(2);
+        err_l2(1) = l_obs2(0) * im2Endx + l_obs2(1) * im2Endy + l_obs2(2);
+        double err2 = err_l2.norm();
+        errorC2[i] = err2;
+
+        vbLineTriangulated[index] = true;
+    }
+
+    return true;
 }
 
 bool Tracking::AcceptMPDepth(const Point3f& P3D)

@@ -26,6 +26,8 @@
 #include "MapPoint.h"
 #include "ORBextractor.h"
 #include "ORBmatcher.h"
+#include "LineExtractor.h"
+#include "LSDmatcher.h"
 
 #include "CameraModels/KannalaBrandt8.h"
 #include "CameraModels/Pinhole.h"
@@ -80,7 +82,7 @@ Frame::Frame(const Frame& frame) :
     mvLeftToRightMatch(frame.mvLeftToRightMatch), mvRightToLeftMatch(frame.mvRightToLeftMatch),
     mvStereo3Dpoints(frame.mvStereo3Dpoints), mTlr(frame.mTlr.clone()), mRlr(frame.mRlr.clone()),
     mtlr(frame.mtlr.clone()), mTrl(frame.mTrl.clone()), mTimeStereoMatch(frame.mTimeStereoMatch),
-    mTimeORB_Ext(frame.mTimeORB_Ext)
+    mTimeORB_Ext(frame.mTimeORB_Ext), mpLSDextractorLeft(frame.mpLSDextractorLeft)
 {
     for (int i = 0; i < FRAME_GRID_COLS; i++)
         for (int j = 0; j < FRAME_GRID_ROWS; j++) {
@@ -114,7 +116,7 @@ Frame::Frame(const cv::Mat& imLeft, const cv::Mat& imRight, const double& timeSt
     mTimeStamp(timeStamp), mK(K.clone()), mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),
     mImuCalib(ImuCalib), mpImuPreintegrated(NULL), mpPrevFrame(pPrevF), mpImuPreintegratedFrame(NULL),
     mpReferenceKF(static_cast<KeyFrame*>(NULL)), mbImuPreintegrated(false), mpCamera(pCamera),
-    mpCamera2(nullptr), mTimeStereoMatch(0), mTimeORB_Ext(0)
+    mpCamera2(nullptr), mTimeStereoMatch(0), mTimeORB_Ext(0), mpLSDextractorLeft(NULL)
 {
     // Frame ID
     mnId = nNextId++;
@@ -215,7 +217,7 @@ Frame::Frame(const cv::Mat& imLeft, const cv::Mat& imRight, const double& timeSt
 // Constructor for RGB-D cameras.
 Frame::Frame(const cv::Mat& imGray, const cv::Mat& imDepth, const double& timeStamp,
              ORBextractor* extractor, ORBVocabulary* voc, cv::Mat& K, cv::Mat& distCoef, const float& bf,
-             const float& thDepth, GeometricCamera* pCamera, Frame* pPrevF, const IMU::Calib& ImuCalib) :
+             const float& thDepth, GeometricCamera* pCamera, Frame* pPrevF, const IMU::Calib& ImuCalib), mpLSDextractorLeft(NULL) :
     mpcpi(NULL),
     mpORBvocabulary(voc), mpORBextractorLeft(extractor),
     mpORBextractorRight(static_cast<ORBextractor*>(NULL)), mTimeStamp(timeStamp), mK(K.clone()),
@@ -301,7 +303,7 @@ Frame::Frame(const cv::Mat& imGray, const cv::Mat& imDepth, const double& timeSt
 // Constructor for Monocular cameras.
 Frame::Frame(const cv::Mat& imGray, const double& timeStamp, ORBextractor* extractor,
              ORBVocabulary* voc, GeometricCamera* pCamera, cv::Mat& distCoef, const float& bf,
-             const float& thDepth, Frame* pPrevF, const IMU::Calib& ImuCalib) :
+             const float& thDepth, Frame* pPrevF, const IMU::Calib& ImuCalib), mpLSDextractorLeft(NULL) :
     mpcpi(NULL),
     mpORBvocabulary(voc), mpORBextractorLeft(extractor),
     mpORBextractorRight(static_cast<ORBextractor*>(NULL)), mTimeStamp(timeStamp),
@@ -403,7 +405,7 @@ Frame::Frame(const cv::Mat& imGray, const double& timeStamp, ORBextractor* extra
 // Constructor for Monocular cameras with mask
 Frame::Frame(const cv::Mat& imGray, const cv::Mat& mask, const double& timeStamp,
              ORBextractor* extractor, ORBVocabulary* voc, GeometricCamera* pCamera, cv::Mat& distCoef,
-             const float& bf, const float& thDepth, Frame* pPrevF, const IMU::Calib& ImuCalib) :
+             const float& bf, const float& thDepth, Frame* pPrevF, const IMU::Calib& ImuCalib), mpLSDextractorLeft(NULL) :
     mpcpi(NULL),
     mpORBvocabulary(voc), mpORBextractorLeft(extractor),
     mpORBextractorRight(static_cast<ORBextractor*>(NULL)), mTimeStamp(timeStamp),
@@ -507,7 +509,7 @@ Frame::Frame(const cv::Mat& imGray, const cv::Mat& mask, const double& timeStamp
 // Constructor for Monocular-Odometry
 Frame::Frame(const cv::Mat& imGray, const cv::Mat& mask, double timeStamp, ORBextractor* extractor, 
              ORBVocabulary* voc, GeometricCamera* pCamera, cv::Mat& distCoef, const float& bf, const float& thDepth, 
-             Frame* pPrevF, const ODOM::Calib& odomCalib) :
+             Frame* pPrevF, const ODOM::Calib& odomCalib), mpLSDextractorLeft(NULL) :
     mpcpi(NULL),
     mpORBvocabulary(voc), mpORBextractorLeft(extractor), mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
     mTimeStamp(timeStamp), mK(static_cast<Pinhole*>(pCamera)->toK()), mDistCoef(distCoef.clone()), mbf(bf),

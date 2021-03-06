@@ -48,6 +48,8 @@ public:
     Point(const cv::Point3f& val, double timestamp = 0.) : data(val), t(timestamp) {}
 
     cv::Mat toCvSE3() const;
+    Point fromCvSE3(const cv::Mat& mat);
+    Point inv() const;
 
     Point operator+(const Point& that) const;
     Point operator-(const Point& that) const;

@@ -24,8 +24,8 @@ int main(int argc, char** argv)
     if (argc < 3) {
         cout << "use default parameters..." << endl;
         settingFile = "/home/vance/dataset/fzu/ORB-SLAM3-Config.yaml";
-        sequenceFolder = "/home/vance/dataset/fzu/201224_hall_1/image/";
-        odomRawFile = "/home/vance/dataset/fzu/201224_hall_1/odom_sync.txt";
+        sequenceFolder = "/home/vance/dataset/fzu/201224_hall_3/image/";
+        odomRawFile = "/home/vance/dataset/fzu/201224_hall_3/odom_sync.txt";
     } else {
         settingFile     = string(argv[1]);
         sequenceFolder  = string(argv[2]);

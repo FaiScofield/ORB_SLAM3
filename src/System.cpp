@@ -417,6 +417,9 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp, const
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+	
+    mTrackedMapLines = mpTracker->mCurrentFrame.mvpMapLines;    //仿照KeyPoint，自己添加的
+    mTrackedKeyLines = mpTracker->mCurrentFrame.mvKeylinesUn;    //仿照KeyPoint，自己添加的
 
     return Tcw;
 }
@@ -473,6 +476,9 @@ cv::Mat System::TrackMonocularWithOdom(const cv::Mat& im, const double& timestam
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+	
+    mTrackedMapLines = mpTracker->mCurrentFrame.mvpMapLines;
+    mTrackedKeyLines = mpTracker->mCurrentFrame.mvKeylinesUn;
 
     return Tcw;
 }
@@ -540,8 +546,10 @@ void System::Shutdown()
         usleep(5000);
     }
 
-    if(mpViewer)
-        pangolin::BindToContext("ORB-SLAM2: Map Viewer");
+    if(mpViewer) {
+        // pangolin::BindToContext("ORB-SLAM2: Map Viewer");
+		pangolin::BindToContext("Map Viewer");
+	}
 }
 
 
@@ -603,7 +611,7 @@ void System::SaveTrajectoryTUM(const string &filename)
         f << setprecision(6) << *lT << " " <<  setprecision(9) << twc.at<float>(0) << " " << twc.at<float>(1) << " " << twc.at<float>(2) << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
     }
     f.close();
-    // cout << endl << "trajectory saved!" << endl;
+    cout << endl << "trajectory saved!" << endl;
 }
 
 void System::SaveKeyFrameTrajectoryTUM(const string &filename)

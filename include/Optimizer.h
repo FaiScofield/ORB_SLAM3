@@ -72,6 +72,9 @@ public:
     void static MergeBundleAdjustmentVisual(KeyFrame* pCurrentKF, vector<KeyFrame*> vpWeldingKFs, vector<KeyFrame*> vpFixedKFs, bool *pbStopFlag);
 
     int static PoseOptimization(Frame* pFrame);
+	int static PoseOptimizationWithPoints(Frame *pFrame);
+	int static PoseOptimizationWithLines(Frame *pFrame);
+	
     int static PoseOptimizationOnSE2(Frame* pFrame, const cv::Mat& _Tbc);
 
     int static PoseInertialOptimizationLastKeyFrame(Frame* pFrame, bool bRecInit = false);
