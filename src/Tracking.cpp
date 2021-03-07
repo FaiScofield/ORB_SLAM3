@@ -2473,6 +2473,19 @@ void Tracking::CreateInitialMapMonocular()
         invMedianDepth = 4.0f / medianDepth;  // 4.0f
     } else if (mSensor == System::ODOM_MONOCULAR) {
         invMedianDepth = 1.0f;
+    #if 1
+        // Tb1b2 = Tbc * Tc1w * Twc2 * Tcb
+        cv::Mat Tb1b2 = mpOdomCalib->Tbc * pKFini->GetPose() * pKFcur->GetPoseInverse() * mpOdomCalib->Tcb;
+        ODOM::Point Tb1b2_se2_vo;
+        Tb1b2_se2_vo.fromCvSE3(Tb1b2);
+        cout << "Tb1b2 from vo   = " << Tb1b2_se2_vo << endl;
+
+        ODOM::Point Tb1b2_se2_odo = (pKFini->mOdom.inv() + pKFcur->mOdom);
+        cout << "Tb1b2 from odom = " << Tb1b2_se2_odo << endl;
+
+        invMedianDepth = sqrt(Tb1b2_se2_odo.normSquare() / Tb1b2_se2_vo.normSquare());
+        cout << "medianDepth = " << medianDepth << ", invMedianDepth = " << invMedianDepth << endl;
+    #endif
     } else {
         invMedianDepth = 1.0f / medianDepth;
     }
