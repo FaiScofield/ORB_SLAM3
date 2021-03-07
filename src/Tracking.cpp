@@ -2276,8 +2276,8 @@ void Tracking::MonocularInitializationWithOdometry()
         LOGT("Initialize between " << mInitialFrame.mnId << " and " << mCurrentFrame.mnId << "...");
 
         // Find correspondences
-        ORBmatcher matcher(0.9, true);  // org 0.9
-        int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 75);
+        ORBmatcher matcher(0.9, true);
+        int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 100);
 
         // Check if there are enough correspondences
         if (nmatches < minKPMatchesForInit)
@@ -2488,6 +2488,7 @@ void Tracking::CreateInitialMapMonocular()
     cv::Mat Tc2w = pKFcur->GetPose();
     Tc2w.col(3).rowRange(0,3) = Tc2w.col(3).rowRange(0,3)*invMedianDepth;
     pKFcur->SetPose(Tc2w);
+    LOGT("Initialize with pose current: " << Tc2w.col(3).rowRange(0, 3).t());
 
     // Scale points
     vector<MapPoint*> vpAllMapPoints = pKFini->GetMapPointMatches();

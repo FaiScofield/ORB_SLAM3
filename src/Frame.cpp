@@ -769,7 +769,8 @@ cv::Mat Frame::GetOdomPose()
 
 bool Frame::isInFrustum(MapPoint* pMP, float viewingCosLimit)
 {
-    if (Nleft == -1) {
+    if (Nleft == -1)
+    {
         // cout << "\na";
         pMP->mbTrackInView = false;
         pMP->mTrackProjX = -1;
@@ -844,7 +845,9 @@ bool Frame::isInFrustum(MapPoint* pMP, float viewingCosLimit)
         // cout << "i";
 
         return true;
-    } else {
+    }
+    else
+    {
         pMP->mbTrackInView = false;
         pMP->mbTrackInViewR = false;
         pMP->mnTrackScaleLevel = -1;
