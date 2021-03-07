@@ -546,6 +546,15 @@ cv::Mat Point::toCvSE3() const
     return (cv::Mat_<float>(4, 4) << c, -s, 0, data.x, s, c, 0, data.y, 0, 0, 1, 0, 0, 0, 0, 1);
 }
 
+Point Point::fromCvSE3(const cv::Mat& mat)
+{
+    double yaw = std::atan2(mat.at<float>(1, 0), mat.at<float>(0, 0));
+    data.z = NormalizeAngle(yaw);
+    data.x = mat.at<float>(0, 3);
+    data.y = mat.at<float>(1, 3);
+    return *this;
+}
+
 Point invOdom(const Point& p)
 {
     float c = std::cos(p.data.z);
