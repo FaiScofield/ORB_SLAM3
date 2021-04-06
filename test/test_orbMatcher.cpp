@@ -198,7 +198,7 @@ int main(int argc, char* argv[])
         Mat noDistort = cv::Mat::zeros(4, 1, CV_32FC1);
         frameCur = Frame(gray, mask, vTimeStamps[k], pDetector.get(), pVocabulary.get(),
                             pCamera.get(), noDistort, 0.f, 0.f);
-        frameCur.imgLeft = gray.clone();
+        frameCur.mImgLeft = gray.clone();
 
         int nMatches, nInliers;
         if (k > 0) {
@@ -212,11 +212,11 @@ int main(int argc, char* argv[])
                 }
             }
 
-            hconcat(frameRef.imgLeft, frameCur.imgLeft, outImg);
+            hconcat(frameRef.mImgLeft, frameCur.mImgLeft, outImg);
             cvtColor(outImg, outImg, COLOR_GRAY2BGR);
-            // drawMatches(frameRef.imgLeft, frameRef.mvKeysUn, frameCur.imgLeft, frameCur.mvKeysUn,
+            // drawMatches(frameRef.mImgLeft, frameRef.mvKeysUn, frameCur.mImgLeft, frameCur.mvKeysUn,
             //             vDMatches, outImg, Scalar(255, 0, 0));
-            const cv::Point2f offset(frameRef.imgLeft.cols, 0);
+            const cv::Point2f offset(frameRef.mImgLeft.cols, 0);
             int nMatchCnt = 0;
             for (int i = 0; i < frameRef.N; ++i) {
                 cv::Point2f pt1 = frameRef.mvKeysUn[i].pt;
@@ -251,7 +251,7 @@ int main(int argc, char* argv[])
                         vDMatchesRefine.push_back(vDMatches[i]);
                     }
                 }
-                drawMatches(frameRef.imgLeft, frameRef.mvKeysUn, frameCur.imgLeft, frameCur.mvKeysUn,
+                drawMatches(frameRef.mImgLeft, frameRef.mvKeysUn, frameCur.mImgLeft, frameCur.mvKeysUn,
                             vDMatchesRefine, outImg, Scalar(0, 255, 0));
                 vDMatches.swap(vDMatchesRefine);
             }
@@ -325,8 +325,8 @@ int main(int argc, char* argv[])
                 //     warpAffine(gray, warpA, A, gray.size());
                 // else
                 //     warpA = Mat::zeros(gray.size(), gray.depth());
-                // addWeighted(frameRef.imgLeft, 0.5, warpH, 0.5, 0, blendH);
-                // addWeighted(frameRef.imgLeft, 0.5, warpA, 0.5, 0, blendA);
+                // addWeighted(frameRef.mImgLeft, 0.5, warpH, 0.5, 0, blendH);
+                // addWeighted(frameRef.mImgLeft, 0.5, warpA, 0.5, 0, blendA);
                 // hconcat(blendH, blendA, blendOut);
                 // imshow("Warpe Images H/A", blendOut);
                 // waitKey(50);

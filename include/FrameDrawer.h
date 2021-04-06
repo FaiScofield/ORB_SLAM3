@@ -81,6 +81,13 @@ protected:
     map<long unsigned int, cv::Point2f> mmProjectPoints;
     map<long unsigned int, cv::Point2f> mmMatchedInImage;
 
+#if WITH_LINES
+    int NL;
+    vector<KeyLine> mvCurrentKeyLines;
+    vector<bool> mvbLineMap, mvbLineVO;
+    vector<KeyLine> mvIniKeyLines;  //初始化时的特征线
+#endif
+
 };
 
 } //namespace ORB_SLAM

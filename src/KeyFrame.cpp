@@ -65,8 +65,8 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mvKeysRight(F.mvKeysRight), NLeft(F.Nleft), NRight(F.Nright), mTrl(F.mTrl), mnNumberOfOpt(0)
 {
 
-    imgLeft = F.imgLeft.clone();
-    imgRight = F.imgRight.clone();
+    mImgLeft = F.mImgLeft.clone();
+    mImgRight = F.mImgRight.clone();
 
     mnId=nNextId++;
 

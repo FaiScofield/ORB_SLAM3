@@ -332,16 +332,16 @@ void MapPoint::ComputeDistinctiveDescriptors()
     // Retrieve all observed descriptors
     vector<cv::Mat> vDescriptors;
 
-    map<KeyFrame*, tuple<int, int>> observations;
+    map<KeyFrame*,tuple<int,int>> observations;
 
     {
         unique_lock<mutex> lock1(mMutexFeatures);
-        if (mbBad)
+        if(mbBad)
             return;
-        observations = mObservations;
+        observations=mObservations;
     }
 
-    if (observations.empty())
+    if(observations.empty())
         return;
 
     vDescriptors.reserve(observations.size());
@@ -370,27 +370,27 @@ void MapPoint::ComputeDistinctiveDescriptors()
     const size_t N = vDescriptors.size();
 
     float Distances[N][N];
-    for (size_t i = 0; i < N; i++)
+    for(size_t i=0;i<N;i++)
     {
-        Distances[i][i] = 0;
-        for (size_t j = i + 1; j < N; j++)
+        Distances[i][i]=0;
+        for(size_t j=i+1;j<N;j++)
         {
-            int distij = ORBmatcher::DescriptorDistance(vDescriptors[i], vDescriptors[j]);
-            Distances[i][j] = distij;
-            Distances[j][i] = distij;
+            int distij = ORBmatcher::DescriptorDistance(vDescriptors[i],vDescriptors[j]);
+            Distances[i][j]=distij;
+            Distances[j][i]=distij;
         }
     }
 
     // Take the descriptor with least median distance to the rest
     int BestMedian = INT_MAX;
     int BestIdx = 0;
-    for (size_t i = 0; i < N; i++)
+    for(size_t i=0;i<N;i++)
     {
-        vector<int> vDists(Distances[i], Distances[i] + N);
-        sort(vDists.begin(), vDists.end());
-        int median = vDists[0.5 * (N - 1)];
+        vector<int> vDists(Distances[i],Distances[i]+N);
+        sort(vDists.begin(),vDists.end());
+        int median = vDists[0.5*(N-1)];
 
-        if (median < BestMedian)
+        if(median<BestMedian)
         {
             BestMedian = median;
             BestIdx = i;
@@ -432,18 +432,18 @@ void MapPoint::UpdateNormalAndDepth()
     {
         unique_lock<mutex> lock1(mMutexFeatures);
         unique_lock<mutex> lock2(mMutexPos);
-        if (mbBad)
+        if(mbBad)
             return;
-        observations = mObservations;
-        pRefKF = mpRefKF;
+        observations=mObservations;
+        pRefKF=mpRefKF;
         Pos = mWorldPos.clone();
     }
 
     if(observations.empty())
         return;
 
-    cv::Mat normal = cv::Mat::zeros(3, 1, CV_32F);
-    int n = 0;
+    cv::Mat normal = cv::Mat::zeros(3,1,CV_32F);
+    int n=0;
     for(map<KeyFrame*,tuple<int,int>>::iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)
     {
         KeyFrame* pKF = mit->first;
@@ -487,9 +487,9 @@ void MapPoint::UpdateNormalAndDepth()
 
     {
         unique_lock<mutex> lock3(mMutexPos);
-        mfMaxDistance = dist * levelScaleFactor;
-        mfMinDistance = mfMaxDistance / pRefKF->mvScaleFactors[nLevels - 1];
-        mNormalVector = normal / n;
+        mfMaxDistance = dist*levelScaleFactor;
+        mfMinDistance = mfMaxDistance/pRefKF->mvScaleFactors[nLevels-1];
+        mNormalVector = normal/n;
     }
 }
 

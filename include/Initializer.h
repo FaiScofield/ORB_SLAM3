@@ -99,6 +99,14 @@ private:
 
     GeometricCamera* mpCamera;
 
+#if WITH_LINES
+    std::vector<KeyLine> mvKeyLines1;
+    std::vector<Vector3d> mvKeyLineFunctions1;
+    std::vector<KeyLine> mvKeyLines2;
+    std::vector<Vector3d> mvKeyLineFunctions2;
+    std::vector<Match> mvLineMatches12;
+    std::vector<bool> mvbLineMatched1;
+#endif
 };
 
 } //namespace ORB_SLAM

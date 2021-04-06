@@ -21,6 +21,7 @@
 #define MAP_H
 
 #include "MapPoint.h"
+#include "MapLine.h"
 #include "KeyFrame.h"
 
 #include <set>
@@ -34,6 +35,7 @@ namespace ORB_SLAM3
 {
 
 class MapPoint;
+class MapLine;
 class KeyFrame;
 class Atlas;
 class KeyFrameDatabase;
@@ -83,6 +85,19 @@ public:
     void SetReferenceMapPoints(const std::vector<MapPoint*> &vpMPs);
     void InformNewBigChange();
     int GetLastBigChangeIdx();
+
+#if WITH_LINES
+	void AddMapLine(MapLine* pML);
+    void EraseMapLine(MapLine* pML);
+    void SetReferenceMapLines(const std::vector<MapLine*> &vpMLs);
+	
+	std::vector<MapLine*> GetAllMapLines();
+    std::vector<MapLine*> GetReferenceMapLines();
+    long unsigned int MapLinesInMap();
+	std::set<MapLine*> mspMapLines;
+	std::vector<MapLine*> mvpReferenceMapLines;
+	std::mutex mMutexLineCreation;
+#endif
 
     std::vector<KeyFrame*> GetAllKeyFrames();
     std::vector<MapPoint*> GetAllMapPoints();

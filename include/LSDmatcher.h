@@ -2,8 +2,8 @@
 // Created by lan on 17-12-26.
 //
 
-#ifndef ORB_SLAM2_LSDMATCHER_H
-#define ORB_SLAM2_LSDMATCHER_H
+#ifndef ORB_SLAM3_LSDMATCHER_H
+#define ORB_SLAM3_LSDMATCHER_H
 
 //#include <line_descriptor/descriptor_custom.hpp>
 //#include <line_descriptor_custom.hpp>
@@ -17,8 +17,9 @@
 
 // using namespace line_descriptor;
 
-namespace ORB_SLAM2
+namespace ORB_SLAM3
 {
+
 class LSDmatcher
 {
 public:
@@ -75,7 +76,8 @@ protected:
     float mfNNratio;
     bool mbCheckOrientation;
 };
-}
+
+}  // namespace ORB_SLAM3
 
 
-#endif //ORB_SLAM2_LSDMATCHER_H
+#endif //ORB_SLAM3_LSDMATCHER_H

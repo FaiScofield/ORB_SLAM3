@@ -2,8 +2,8 @@
 // Created by lan on 18-1-12.
 //
 
-#ifndef ORB_SLAM2_LINEEDGE_H
-#define ORB_SLAM2_LINEEDGE_H
+#ifndef ORB_SLAM3_LINEEDGE_H
+#define ORB_SLAM3_LINEEDGE_H
 
 #include <iostream>
 #include <Eigen/Core>
@@ -91,7 +91,7 @@ public:
 
     Eigen::Vector2d project2d(const Eigen::Vector3d& v)
     {
-        Vector2d res;
+        Eigen::Vector2d res;
         res(0) = v(0)/v(2);
         res(1) = v(1)/v(2);
         return res;
@@ -186,31 +186,31 @@ public:
         return os.good();
     }
 
-    Vector2d project2d(const Vector3d& v)
+    Eigen::Vector2d project2d(const Eigen::Vector3d& v)
     {
-        Vector2d res;
+        Eigen::Vector2d res;
         res(0) = v(0)/v(2);
         res(1) = v(1)/v(2);
         return res;
     }
 
-    Vector2d cam_project(const Vector3d& trans_xyz)
+    Eigen::Vector2d cam_project(const Eigen::Vector3d& trans_xyz)
     {
-        Vector2d proj = project2d(trans_xyz);
-        Vector2d res;
+        Eigen::Vector2d proj = project2d(trans_xyz);
+        Eigen::Vector2d res;
         res[0] = proj[0]*fx + cx;
         res[1] = proj[1]*fy + cy;
         return res;
     }
 
-    Vector3d Xw;    //MapLine的一个端点在世界坐标系的位置
+    Eigen::Vector3d Xw;    //MapLine的一个端点在世界坐标系的位置
     double fx, fy, cx, cy;  //相机内参数
 };
 
 /**
  * 线段端点和相机位姿之间的边，线段端点的类型仍然采用g2o中的3D坐标类型
  */
-class EdgeLineProjectXYZ : public g2o::BaseBinaryEdge<3, Vector3d, g2o::VertexSBAPointXYZ, g2o::VertexSE3Expmap>
+class EdgeLineProjectXYZ : public g2o::BaseBinaryEdge<3, Eigen::Vector3d, g2o::VertexSBAPointXYZ, g2o::VertexSE3Expmap>
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -221,8 +221,8 @@ public:
         const g2o::VertexSE3Expmap* v1 = static_cast<g2o::VertexSE3Expmap *>(_vertices[1]);
         const g2o::VertexSBAPointXYZ* v2 = static_cast<g2o::VertexSBAPointXYZ*>(_vertices[0]);
 
-        Vector3d obs = _measurement;    //线段所在直线参数
-        Vector2d proj = cam_project(v1->estimate().map(v2->estimate()));
+        Eigen::Vector3d obs = _measurement;    //线段所在直线参数
+        Eigen::Vector2d proj = cam_project(v1->estimate().map(v2->estimate()));
         _error(0) = obs(0) * proj(0) + obs(1)*proj(1) + obs(2);
         _error(1) = 0.0;
         _error(2) = 0.0;
@@ -297,25 +297,25 @@ public:
         return os.good();
     }
 
-    Vector2d project2d(const Vector3d& v)
+    Eigen::Vector2d project2d(const Eigen::Vector3d& v)
     {
-        Vector2d res;
+        Eigen::Vector2d res;
         res(0) = v(0)/v(2);
         res(1) = v(1)/v(2);
         return res;
     }
 
-    Vector2d cam_project(const Vector3d& trans_xyz)
+    Eigen::Vector2d cam_project(const Eigen::Vector3d& trans_xyz)
     {
-        Vector2d proj = project2d(trans_xyz);
-        Vector2d res;
+        Eigen::Vector2d proj = project2d(trans_xyz);
+        Eigen::Vector2d res;
         res[0] = proj[0]*fx + cx;
         res[1] = proj[1]*fy + cy;
         return res;
     }
 
-    Vector3d Xw;    //MapLine的一个端点在世界坐标系的位置
+    Eigen::Vector3d Xw;    //MapLine的一个端点在世界坐标系的位置
     double fx, fy, cx, cy;  //相机内参数
 };
 
-#endif //ORB_SLAM2_LINEEDGE_H
+#endif //ORB_SLAM3_LINEEDGE_H

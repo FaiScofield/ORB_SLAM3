@@ -2,8 +2,8 @@
 // Created by lan on 17-12-20.
 //
 
-#ifndef ORB_SLAM2_MAPLINE_H
-#define ORB_SLAM2_MAPLINE_H
+#ifndef ORB_SLAM3_MAPLINE_H
+#define ORB_SLAM3_MAPLINE_H
 
 #include "KeyFrame.h"
 #include "Frame.h"
@@ -17,7 +17,7 @@
 #include <map>
 
 
-namespace ORB_SLAM2
+namespace ORB_SLAM3
 {
 
 class KeyFrame;
@@ -172,7 +172,7 @@ public:
     std::mutex mMutexFeatures;
 };
 
-}
+}  // namespace ORB_SLAM3
 
 
-#endif //ORB_SLAM2_MAPLINE_H
+#endif //ORB_SLAM3_MAPLINE_H

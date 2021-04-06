@@ -45,6 +45,10 @@ public:
     void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M, pangolin::OpenGlMatrix &MOw);
     void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M, pangolin::OpenGlMatrix &MOw, pangolin::OpenGlMatrix &MTwwp);
 
+#if WITH_LINES
+	void DrawMapLines();
+	float mLineWidth;
+#endif
 private:
 
     bool ParseViewerParamFile(cv::FileStorage &fSettings);

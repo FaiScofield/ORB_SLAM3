@@ -70,10 +70,7 @@ public:
     void RequestFinish();
     bool isFinished();
 
-    void setOdometry(bool flag) { mbOdometry = flag; }
-
-    int KeyframesInQueue()
-    {
+    int KeyframesInQueue(){
         unique_lock<std::mutex> lock(mMutexNewKFs);
         return mlNewKeyFrames.size();
     }
@@ -126,11 +123,21 @@ protected:
 
     cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
 
+#if WITH_LINES
+	void CreateNewMapLines();
+    void CreateNewMapLinesConstraint();
+	void SearchLineInNeighbors();
+	void MapLineCulling(); 
+	// For Debugging
+    cv::Mat DrawLines(KeyFrame* KF1, KeyFrame* KF2);
+	
+	std::list<MapLine*> mlpRecentAddedMapLines;
+#endif
+
     System *mpSystem;
 
     bool mbMonocular;
     bool mbInertial;
-    bool mbOdometry;
 
     void ResetIfRequested();
     bool mbResetRequested;

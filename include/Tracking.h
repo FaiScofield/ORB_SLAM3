@@ -34,7 +34,6 @@
 #include "LocalMapping.h"
 #include "LoopClosing.h"
 #include "MapDrawer.h"
-// #include "Odometry.h"
 #include "ORBVocabulary.h"
 #include "ORBextractor.h"
 #include "LineExtractor.h"
@@ -69,7 +68,6 @@ public:
     bool ParseCamParamFile(cv::FileStorage &fSettings);
     bool ParseORBParamFile(cv::FileStorage &fSettings);
     bool ParseIMUParamFile(cv::FileStorage &fSettings);
-    bool ParseOdomParamFile(cv::FileStorage &fSettings);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp, string filename);
@@ -78,13 +76,11 @@ public:
     // cv::Mat GrabImageImuMonocular(const cv::Mat &im, const double &timestamp);
 
     void GrabImuData(const IMU::Point &imuMeasurement);
-    void GrabOdomData(const ODOM::Point &odomMeasurement);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
     void SetViewer(Viewer* pViewer);
     void SetStepByStep(bool bSet);
-    void SetWithLines(bool flag) { mbWithLines = flag; }
 
     // Load new settings
     // The focal lenght should be similar or scale prediction will fail when projecting points
@@ -94,7 +90,6 @@ public:
     void InformOnlyTracking(const bool &flag);
 
     void UpdateFrameIMU(const float s, const IMU::Bias &b, KeyFrame* pCurrentKeyFrame);
-    void UpdateFrameODOM(const float s, KeyFrame* pCurrentKeyFrame);
     KeyFrame* GetLastKeyFrame()
     {
         return mpLastKeyFrame;
@@ -107,18 +102,18 @@ public:
     void NewDataset();
     int GetNumberDataset();
     int GetMatchesInliers();
+
 public:
 
     // Tracking states
-    enum eTrackingState
-    {
-        SYSTEM_NOT_READY = -1,
-        NO_IMAGES_YET = 0,
-        NOT_INITIALIZED = 1,
-        OK = 2,
-        RECENTLY_LOST = 3,
-        LOST = 4,
-        OK_KLT = 5
+    enum eTrackingState{
+        SYSTEM_NOT_READY=-1,
+        NO_IMAGES_YET=0,
+        NOT_INITIALIZED=1,
+        OK=2,
+        RECENTLY_LOST=3,
+        LOST=4,
+        OK_KLT=5
     };
 
     eTrackingState mState;
@@ -130,24 +125,15 @@ public:
     // Current Frame
     Frame mCurrentFrame;
     Frame mLastFrame;
-	Frame mInitialFrame;
-	
+    Frame mInitialFrame;
+
     cv::Mat mImGray;
 
     // Initialization Variables (Monocular)
-    ////////////////////////////////////////////////////////////////////////////////////////
-    // Points
     std::vector<int> mvIniLastMatches;
     std::vector<int> mvIniMatches;
     std::vector<cv::Point2f> mvbPrevMatched;
     std::vector<cv::Point3f> mvIniP3D;
-	
-    ///////////////////////////////////////////////////////////////////////////////////////
-    // Lines
-    std::vector<int> mvIniLastLineMatches;
-    vector<int> mvIniLineMatches;
-    vector<cv::Point3f> mvLineS3D;   //初始化时线段起始点的3D位置
-    vector<cv::Point3f> mvLineE3D;   //初始化时线段终止点的3D位置
 
     // Lists used to recover the full camera trajectory at the end of the execution.
     // Basically we store the reference keyframe for each frame and its relative transformation
@@ -171,10 +157,7 @@ public:
     double t0; // time-stamp of first read frame
     double t0vis; // time-stamp of first inserted keyframe
     double t0IMU; // time-stamp of IMU initialization
-    double t0ODOM; // time-stamp of ODOM initialization
 
-    int mnInitFailedCnt;
-    float mInitDeltaTrans;
 
     vector<MapPoint*> GetLocalMapMPS();
 
@@ -186,6 +169,42 @@ public:
 
     bool mbWriteStats;
 
+#if WITH_ODOMETRY
+    int mnInitFailedCnt;
+    float mInitDeltaTrans;
+    ODOM::Calib *mpOdomCalib;
+    std::list<ODOM::Point> mlQueueOdomData;
+    std::mutex mMutexOdomQueue;
+
+    bool ParseOdomParamFile(cv::FileStorage &fSettings);
+    void GrabOdomData(const ODOM::Point &odomMeasurement);
+    void UpdateFrameODOM(const float s, KeyFrame* pCurrentKeyFrame);
+    static bool AcceptMPDepth(const cv::Point3f& P3D);
+    static bool AcceptMPDepth(const cv::Mat& P3D);
+    bool TriangulateWithOdometry(const std::vector<cv::KeyPoint>& vKeys1, const std::vector<cv::KeyPoint>& vKeys2, 
+                                 const std::vector<int>& vMatches12, cv::Mat& R21, cv::Mat& t21,
+                                 std::vector<cv::Point3f>& vP3D, std::vector<bool>& vbTriangulated);
+    void MonocularInitializationWithOdometry();
+    bool TrackWithOdometry();
+#endif
+
+#if WITH_LINES
+    void UpdateLocalLines();
+    void SearchLocalLines();
+    bool TriangulateLines(const std::vector<cv::KeyPoint>& vKL1, const std::vector<cv::KeyPoint>& vKL2,
+                          const std::vector<int>& vMatches12, cv::Mat& R21, cv::Mat& t21,
+                          std::vector<cv::Point3f>& vP3dS, std::vector<cv::Point3f>& vP3dE, std::vector<bool>& vbTriangulated);
+
+    LINEextractor* mpLSDextractorLeft;
+
+    std::vector<int> mvIniLastLineMatches;
+    std::vector<int> mvIniLineMatches;
+    std::vector<cv::Point3f> mvLineS3D;   //初始化时线段起始点的3D位置
+    std::vector<cv::Point3f> mvLineE3D;   //初始化时线段终止点的3D位置
+    std::vector<MapLine*> mvpLocalMapLines;
+    int mnLineMatchesInliers;
+#endif
+
 protected:
 
     // Main tracking function. It is independent of the input sensor.
@@ -196,7 +215,6 @@ protected:
 
     // Map initialization for monocular
     void MonocularInitialization();
-    void MonocularInitializationWithOdometry();
     void CreateNewMapPoints();
     cv::Mat ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2);
     void CreateInitialMapMonocular();
@@ -207,61 +225,42 @@ protected:
     bool TrackWithMotionModel();
     bool PredictStateIMU();
 
-    bool TrackWithOdometry();
-
     bool Relocalization();
 
     void UpdateLocalMap();
     void UpdateLocalPoints();
-    void UpdateLocalLines();
     void UpdateLocalKeyFrames();
 
     bool TrackLocalMap();
     bool TrackLocalMap_old();
     void SearchLocalPoints();
-    void SearchLocalLines();
 
     bool NeedNewKeyFrame();
     void CreateNewKeyFrame();
 
     // Perform preintegration from last frame
     void PreintegrateIMU();
-    void PreintegrateODOM();
 
     // Reset IMU biases and compute frame velocity
     void ResetFrameIMU();
-    void ResetFrameODOM();
     void ComputeGyroBias(const vector<Frame*> &vpFs, float &bwx,  float &bwy, float &bwz);
     void ComputeVelocitiesAccBias(const vector<Frame*> &vpFs, float &bax,  float &bay, float &baz);
 
-    bool AcceptMPDepth(const cv::Point3f& P3D);
-    bool AcceptMPDepth(const cv::Mat& P3D);
-    bool TriangulateWithOdometry(const std::vector<cv::KeyPoint>& vKeys1, const std::vector<cv::KeyPoint>& vKeys2, 
-                                 const std::vector<int>& vMatches12, cv::Mat& R21, cv::Mat& t21,
-                                 std::vector<cv::Point3f>& vP3D, std::vector<bool>& vbTriangulated);
-    bool TriangulateLines(const std::vector<cv::KeyPoint>& vKL1, const std::vector<cv::KeyPoint>& vKL2,
-                          const std::vector<int>& vMatches12, cv::Mat& R21, cv::Mat& t21,
-                          std::vector<cv::Point3f>& vP3dS, std::vector<cv::Point3f>& vP3dE, std::vector<bool>& vbTriangulated);
 
     bool mbMapUpdated;
 
     // Imu preintegration from last frame
     IMU::Preintegrated *mpImuPreintegratedFromLastKF;
-    // ODOM::Preintegrated *mpOdomPreintegratedFromLastKF;
 
     // Queue of IMU measurements **BETWEEN FRAMES**!
     std::list<IMU::Point> mlQueueImuData;
-    std::list<ODOM::Point> mlQueueOdomData;
 
     // Vector of IMU measurements from previous to current frame (to be filled by PreintegrateIMU)
     std::vector<IMU::Point> mvImuFromLastFrame;
-    // std::vector<ODOM::Point> mvOdomFromLastFrame;
     std::mutex mMutexImuQueue;
-    std::mutex mMutexOdomQueue;
 
     // Imu calibration parameters
     IMU::Calib *mpImuCalib;
-    ODOM::Calib *mpOdomCalib;
 
     // Last Bias Estimation (at keyframe creation)
     IMU::Bias mLastBias;
@@ -280,9 +279,6 @@ protected:
     ORBextractor* mpORBextractorLeft, *mpORBextractorRight;
     ORBextractor* mpIniORBextractor;
 
-    // Line
-    LINEextractor* mpLSDextractorLeft;
-
     //BoW
     ORBVocabulary* mpORBVocabulary;
     KeyFrameDatabase* mpKeyFrameDB;
@@ -295,8 +291,7 @@ protected:
     KeyFrame* mpReferenceKF;
     std::vector<KeyFrame*> mvpLocalKeyFrames;
     std::vector<MapPoint*> mvpLocalMapPoints;
-    std::vector<MapLine*> mvpLocalMapLines;
-    
+
     // System
     System* mpSystem;
     
@@ -320,8 +315,6 @@ protected:
 
     int mnFirstImuFrameId;
     int mnFramesToResetIMU;
-    int mnFirstOdomFrameId;
-    int mnFramesToResetOdom;
 
     // Threshold close/far points
     // Points seen as close by the stereo/RGBD sensor are considered reliable
@@ -333,7 +326,6 @@ protected:
 
     //Current matches in frame
     int mnMatchesInliers;
-    int mnLineMatchesInliers;
 
     //Last Frame, KeyFrame and Relocalisation Info
     KeyFrame* mpLastKeyFrame;
@@ -354,7 +346,6 @@ protected:
 
     //Color order (true RGB, false BGR, ignored if grayscale)
     bool mbRGB;
-    bool mbWithLines;
 
     std::list<MapPoint*> mlpTemporalPoints;
 
@@ -366,7 +357,6 @@ protected:
 
     ofstream f_track_times;
     double mTime_PreIntIMU;
-    double mTime_PreIntOdom;
     double mTime_PosePred;
     double mTime_LocalMapTrack;
     double mTime_NewKF_Dec;

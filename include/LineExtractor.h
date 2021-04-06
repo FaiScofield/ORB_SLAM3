@@ -14,7 +14,7 @@
 
 #include "auxiliar.h"
 
-namespace ORB_SLAM2
+namespace ORB_SLAM3
 {
 
 class LINEextractor
@@ -60,6 +60,7 @@ protected:
     std::vector<float> mvInvLevelSigma2;
 
 };
-}
 
-#endif
+}  // namespace ORB_SLAM3
+
+#endif  // LINEEXTRACTOR_H

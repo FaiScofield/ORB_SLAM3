@@ -71,7 +71,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         cout << "Stereo-Inertial" << endl;
     else if(mSensor==ODOM_MONOCULAR)
         cout << "Monocular-Odometry" << endl;
-		
+
     //Check settings file
     cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
     if(!fsSettings.isOpened())
@@ -192,7 +192,6 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR || mSensor==ODOM_MONOCULAR, mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO, strSequence);
-    mpLocalMapper->setOdometry(mSensor == ODOM_MONOCULAR);
     mptLocalMapping = new thread(&ORB_SLAM3::LocalMapping::Run, mpLocalMapper);
     mpLocalMapper->mInitFr = initFr;
     mpLocalMapper->mThFarPoints = fsSettings["thFarPoints"];
@@ -417,13 +416,16 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp, const
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
-	
-    mTrackedMapLines = mpTracker->mCurrentFrame.mvpMapLines;    //仿照KeyPoint，自己添加的
-    mTrackedKeyLines = mpTracker->mCurrentFrame.mvKeylinesUn;    //仿照KeyPoint，自己添加的
+
+// #if WITH_LINES
+//     mTrackedMapLines = mpTracker->mCurrentFrame.mvpMapLines;
+//     mTrackedKeyLines = mpTracker->mCurrentFrame.mvKeylinesUn;
+// #endif
 
     return Tcw;
 }
 
+#if WITH_ODOMETRY
 cv::Mat System::TrackMonocularWithOdom(const cv::Mat& im, const double& timestamp, const vector<ODOM::Point>& vOdomMeas, string filename)
 {
     if (mSensor != ODOM_MONOCULAR) {
@@ -434,18 +436,21 @@ cv::Mat System::TrackMonocularWithOdom(const cv::Mat& im, const double& timestam
     // Check mode change
     {
         unique_lock<mutex> lock(mMutexMode);
-        if (mbActivateLocalizationMode) {
+        if(mbActivateLocalizationMode)
+        {
             mpLocalMapper->RequestStop();
 
             // Wait until Local Mapping has effectively stopped
-            while (!mpLocalMapper->isStopped()) {
+            while(!mpLocalMapper->isStopped())
+            {
                 usleep(1000);
             }
 
             mpTracker->InformOnlyTracking(true);
             mbActivateLocalizationMode = false;
         }
-        if (mbDeactivateLocalizationMode) {
+        if(mbDeactivateLocalizationMode)
+        {
             mpTracker->InformOnlyTracking(false);
             mpLocalMapper->Release();
             mbDeactivateLocalizationMode = false;
@@ -455,11 +460,14 @@ cv::Mat System::TrackMonocularWithOdom(const cv::Mat& im, const double& timestam
     // Check reset
     {
         unique_lock<mutex> lock(mMutexReset);
-        if (mbReset) {
+        if(mbReset)
+        {
             mpTracker->Reset();
             mbReset = false;
             mbResetActiveMap = false;
-        } else if (mbResetActiveMap) {
+        }
+        else if(mbResetActiveMap)
+        {
             cout << "SYSTEM-> Reseting active map in monocular case" << endl;
             mpTracker->ResetActiveMap();
             mbResetActiveMap = false;
@@ -470,18 +478,21 @@ cv::Mat System::TrackMonocularWithOdom(const cv::Mat& im, const double& timestam
     for (size_t j = 0; j < vOdomMeas.size(); j++)
         mpTracker->GrabOdomData(vOdomMeas[j]);
 
-    cv::Mat Tcw = mpTracker->GrabImageMonocular(im, timestamp, filename);
+    cv::Mat Tcw = mpTracker->GrabImageMonocular(im,timestamp,filename);
 
     unique_lock<mutex> lock2(mMutexState);
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
-	
-    mTrackedMapLines = mpTracker->mCurrentFrame.mvpMapLines;
-    mTrackedKeyLines = mpTracker->mCurrentFrame.mvKeylinesUn;
+
+// #if WITH_LINES
+//     mTrackedMapLines = mpTracker->mCurrentFrame.mvpMapLines;
+//     mTrackedKeyLines = mpTracker->mCurrentFrame.mvKeylinesUn;
+// #endif
 
     return Tcw;
 }
+#endif
 
 void System::ActivateLocalizationMode()
 {
@@ -547,9 +558,9 @@ void System::Shutdown()
     }
 
     if(mpViewer) {
-        // pangolin::BindToContext("ORB-SLAM2: Map Viewer");
-		pangolin::BindToContext("Map Viewer");
-	}
+        // pangolin::BindToContext("ORB-SLAM3: Map Viewer");
+        pangolin::BindToContext("Map Viewer");
+    }
 }
 
 

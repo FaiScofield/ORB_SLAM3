@@ -177,7 +177,7 @@ PenaltyExcessCharacter: 1
 PenaltyReturnTypeOnItsOwnLine: 5
 
 # 指针对齐位置: Left, Right, Middle
-PointerAlignment: Left
+PointerAlignment: Right
 # PointerBindsToType: true
 # RawStringFormats:
 # 注释自动排版

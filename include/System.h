@@ -22,12 +22,13 @@
 
 //#define SAVE_TIMES
 
-#include <opencv2/core/core.hpp>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
 #include <thread>
-#include <unistd.h>
+#include <opencv2/core/core.hpp>
+#include <opencv2/line_descriptor.hpp>
 
 #include "Tracking.h"
 #include "FrameDrawer.h"
@@ -78,6 +79,7 @@ class Atlas;
 class Tracking;
 class LocalMapping;
 class LoopClosing;
+class MapLine;
 
 class System
 {
@@ -121,7 +123,10 @@ public:
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
     cv::Mat TrackMonocular(const cv::Mat &im, const double &timestamp, const vector<IMU::Point>& vImuMeas = vector<IMU::Point>(), string filename="");
+
+#if WITH_ODOMETRY
     cv::Mat TrackMonocularWithOdom(const cv::Mat &im, const double &timestamp, const vector<ODOM::Point>& vOdomMeas = vector<ODOM::Point>(), string filename="");
+#endif
 
     // This stops local mapping thread (map building) and performs only camera tracking.
     void ActivateLocalizationMode();
@@ -242,6 +247,11 @@ private:
     std::vector<MapPoint*> mTrackedMapPoints;
     std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
     std::mutex mMutexState;
+
+// #if WITH_LINES
+//     std::vector<MapLine*> mTrackedMapLines;
+//     std::vector<cv::line_descriptor::KeyLine> mTrackedKeyLines;
+// #endif
 };
 
 }// namespace ORB_SLAM

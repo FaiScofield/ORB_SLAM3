@@ -44,6 +44,7 @@ namespace ORB_SLAM3
 
 class Map;
 class MapPoint;
+class MapLine;
 class Frame;
 class KeyFrameDatabase;
 
@@ -343,10 +344,11 @@ public:
 
     // KeyPoint functions
     std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r, const bool bRight = false) const;
-    std::vector<size_t> GetLinesInArea(const float &x1, const float &y1, const float &x2, const float &y2, const float &r, const float TH = 0.998) const;
-    std::vector<size_t> GetFeaturesInAreaForLine(const float &x1, const float &y1, const float &x2, const float &y2, const float  &r, const float TH = 0.998) const;
     cv::Mat UnprojectStereo(int i);
 
+#if WITH_LINES
+ 	std::vector<size_t> GetLinesInArea(const float &x1, const float &y1, const float &x2, const float &y2, const float &r, const float TH = 0.998) const;
+    std::vector<size_t> GetFeaturesInAreaForLine(const float &x1, const float &y1, const float &x2, const float &y2, const float  &r, const float TH = 0.998) const;
     // MapLine observation functions,自己添加的，仿照MapPoint
     void AddMapLine(MapLine* pML, const size_t &idx);
     void EraseMapLineMatch(const size_t &idx);
@@ -357,6 +359,27 @@ public:
     int TrackedMapLines(const int &minObs);
     MapLine* GetMapLine(const size_t &idx);
     void lineDescriptorMAD(std::vector<std::vector<cv::DMatch>> line_matches, double &nn_mad, double &nn12_mad) const;
+
+	int NL;
+	
+	// KeyLines，自己添加的，仿照KeyPoints
+    const std::vector<cv::line_descriptor::KeyLine> mvKeyLines;
+    const cv::Mat mLineDescriptors;
+    std::vector<Eigen::Vector3d> mvKeyLineFunctions;
+	
+	  // Scale Line
+    const int mnScaleLevelsLine;
+    const float mfScaleFactorLine;
+    const float mfLogScaleFactorLine;
+    const std::vector<float> mvScaleFactorsLine;
+    const std::vector<float> mvLevelSigma2Line;
+    const std::vector<float> mvInvLevelSigma2Line;
+#endif
+
+
+#if WITH_ODOMETRY
+	ODOM::Point mOdom;
+#endif
 
     // Image
     bool IsInImage(const float &x, const float &y) const;
@@ -479,11 +502,6 @@ public:
     const std::vector<float> mvDepth; // negative value for monocular points
     const cv::Mat mDescriptors;
 
-    // KeyLines，自己添加的，仿照KeyPoints
-    const std::vector<cv::line_descriptor::KeyLine> mvKeyLines;
-    const cv::Mat mLineDescriptors;
-    std::vector<Eigen::Vector3d> mvKeyLineFunctions;
-
     //BoW
     DBoW2::BowVector mBowVec;
     DBoW2::FeatureVector mFeatVec;
@@ -491,21 +509,13 @@ public:
     // Pose relative to parent (this is computed when bad flag is activated)
     cv::Mat mTcp;
 
-    // Scale Point
+    // Scale
     const int mnScaleLevels;
     const float mfScaleFactor;
     const float mfLogScaleFactor;
     const std::vector<float> mvScaleFactors;
     const std::vector<float> mvLevelSigma2;
     const std::vector<float> mvInvLevelSigma2;
-
-    // Scale Line
-    const int mnScaleLevelsLine;
-    const float mfScaleFactorLine;
-    const float mfLogScaleFactorLine;
-    const std::vector<float> mvScaleFactorsLine;
-    const std::vector<float> mvLevelSigma2Line;
-    const std::vector<float> mvInvLevelSigma2Line;
 
     // Image bounds and calibration
     const int mnMinX;
@@ -534,7 +544,6 @@ public:
     bool mbHasHessian;
     cv::Mat mHessianPose;
 
-    ODOM::Point mOdom;
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:
 
@@ -629,7 +638,7 @@ public:
     cv::Mat GetRightRotation();
     cv::Mat GetRightTranslation();
 
-    cv::Mat imgLeft, imgRight; //TODO Backup??
+    cv::Mat mImgLeft, mImgRight; //TODO Backup??
 
     void PrintPointDistribution(){
         int left = 0, right = 0;
