@@ -4,7 +4,7 @@
 #include "LSDmatcher.h"
 #include <opencv2/calib3d.hpp>
 
-#define ENBALE_REMOVE_OUTLIER_WITH_RANSAC 1
+#define ENBALE_REMOVE_OUTLIER_WITH_RANSAC 0
 #define ENBALE_DEBUG_DATA_LSDMATCHER 0
 
 #define PI 3.1415926

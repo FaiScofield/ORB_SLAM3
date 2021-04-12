@@ -24,10 +24,11 @@
 #include "MapPoint.h"
 #include "Atlas.h"
 
-#include<opencv2/core/core.hpp>
-#include<opencv2/features2d/features2d.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/line_descriptor.hpp>
 
-#include<mutex>
+#include <mutex>
 #include <unordered_set>
 
 
@@ -83,9 +84,9 @@ protected:
 
 #if WITH_LINES
     int NL;
-    vector<KeyLine> mvCurrentKeyLines;
+    vector<cv::line_descriptor::KeyLine> mvCurrentKeyLines;
+    vector<cv::line_descriptor::KeyLine> mvIniKeyLines;
     vector<bool> mvbLineMap, mvbLineVO;
-    vector<KeyLine> mvIniKeyLines;  //初始化时的特征线
 #endif
 
 };

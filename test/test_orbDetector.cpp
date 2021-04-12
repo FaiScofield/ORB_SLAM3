@@ -2,13 +2,16 @@
 #include <boost/filesystem.hpp>
 #include <iostream>
 #include <opencv2/features2d.hpp>
+#include <opencv2/xfeatures2d/nonfree.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <vector>
 
 #define ENABLE_SAVE_RESULT 1
-#define DEFAULT_DATASET_FOLDER "/home/vance/dataset/se2/DatasetRoom/image/"
-#define DEFAULT_OUTPUT_FOLDER "/home/vance/output/se2/"
+// #define DEFAULT_DATASET_FOLDER "/home/vance/dataset/se2/DatasetRoom/image/"
+// #define DEFAULT_OUTPUT_FOLDER "/home/vance/output/se2/"
+#define DEFAULT_DATASET_FOLDER "/home/vance/dataset/fzu/201224_indoor/image/"
+#define DEFAULT_OUTPUT_FOLDER "/home/vance/output/"
 #define OUTPUT_FILE_PREFIX  "with_mask_"
 
 using namespace ORB_SLAM3;
@@ -20,6 +23,8 @@ void readImagesRK(const string& strImagePath, vector<string>& vstrImages,
                   vector<double>& vTimeStamps);
 void readImagesSE2(const string& strImagePath, vector<string>& vstrImages,
                    vector<double>& vTimeStamps);
+void readImagesFZU(const string& strImagePath, vector<string>& vstrImages, vector<double>& vTimeStamps);
+
 
 int main(int argc, char* argv[])
 {
@@ -65,9 +70,12 @@ int main(int argc, char* argv[])
     //             return atoi(lhs.substr(0, idx1).c_str()) < atoi(rhs.substr(0, idx2).c_str());
     //         }
     // );
-    readImagesSE2(inputFolder, vStrImages, vTimeStamps);
+    // readImagesSE2(inputFolder, vStrImages, vTimeStamps);
+    readImagesFZU(inputFolder, vStrImages, vTimeStamps);
 
     ORBextractor detector(500, 2, 3, 17, 12);
+    detector.SetFeatureType(ORBextractor::SURF);
+
     Ptr<CLAHE> claher = createCLAHE(2.0, Size(6, 6));
 
     cv::Mat K = cv::Mat::eye(3, 3, CV_32FC1);
@@ -133,11 +141,11 @@ int main(int argc, char* argv[])
         hconcat(outImg1, outImg2, outImg);
     #if ENABLE_SAVE_RESULT
         if (k % 10 == 0) {
-            snprintf(imgFile, 64, "%s/%sresult_no_eq_%04d.jpg", outputFolder.c_str(), OUTPUT_FILE_PREFIX, k);
-            imwrite(imgFile, outImg1);
-            snprintf(imgFile, 64, "%s/%sresult_with_eq_%04d.jpg", outputFolder.c_str(), OUTPUT_FILE_PREFIX, k);
-            imwrite(imgFile, outImg2);
-            snprintf(imgFile, 64, "%s/%sresult_compare_%04d.jpg", outputFolder.c_str(), OUTPUT_FILE_PREFIX, k);
+            // snprintf(imgFile, 64, "%s/%sresult_no_eq_%04d.png", outputFolder.c_str(), OUTPUT_FILE_PREFIX, k);
+            // imwrite(imgFile, outImg1);
+            // snprintf(imgFile, 64, "%s/%sresult_with_eq_%04d.png", outputFolder.c_str(), OUTPUT_FILE_PREFIX, k);
+            // imwrite(imgFile, outImg2);
+            snprintf(imgFile, 64, "%s/%sresult_compare_%04d.png", outputFolder.c_str(), OUTPUT_FILE_PREFIX, k);
             imwrite(imgFile, outImg);
         }
     #endif
@@ -166,7 +174,7 @@ void readImagesRK(const string& strImagePath, vector<string>& vstrImages, vector
         if (bf::is_directory(iter->status()))
             continue;
         if (bf::is_regular_file(iter->status())) {
-            // format: /frameRaw12987978101.jpg
+            // format: /frameRaw12987978101.png
             string s = iter->path().string();
             size_t i = s.find_last_of('w');
             size_t j = s.find_last_of('.');
@@ -222,5 +230,55 @@ void readImagesSE2(const string& strImagePath, vector<string>& vstrImages, vecto
         return;
     } else {
         cout << "[Main ][Info ] Read " << numImgs << " image files in the folder." << endl;
+    }
+}
+
+// format: .../1596818919.30935264.png
+void readImagesFZU(const string& strImagePath, vector<string>& vstrImages, vector<double>& vTimeStamps)
+{
+    bf::path path(strImagePath);
+    if (!bf::exists(path)) {
+        cerr << "[Main ][Error] Data folder doesn't exist!" << endl;
+        return;
+    }
+
+    vector<pair<string, double>> vstrImgTime;
+    vstrImgTime.reserve(3000);
+
+    bf::directory_iterator end_iter;
+    for (bf::directory_iterator iter(path); iter != end_iter; ++iter) {
+        if (bf::is_directory(iter->status()))
+            continue;
+        if (bf::is_regular_file(iter->status())) {
+            // format: /frameRaw12987978101.png
+            string s = iter->path().string();
+            size_t i = s.find_last_of('/');
+            size_t j = s.find_last_of('.');
+            if (i == string::npos || j == string::npos)
+                continue;
+            auto t = atof(s.substr(i + 1, j - i - 1).c_str());
+            vstrImgTime.emplace_back(s, t);
+        }
+    }
+    int a = 1;
+    a = a + 1;
+    sort(vstrImgTime.begin(), vstrImgTime.end(),
+         [](const pair<string, double>& lf, const pair<string, double>& rf) {
+             return lf.second < rf.second;
+         });
+
+    const size_t numImgs = vstrImgTime.size();
+    if (!numImgs) {
+        cerr << "[Main ][Error] Not image data in the folder!" << endl;
+        return;
+    } else {
+        cout << "[Main ][Info ] Read " << numImgs << " image files in the folder." << endl;
+    }
+
+    vTimeStamps.resize(numImgs);
+    vstrImages.resize(numImgs);
+    for (size_t k = 0; k < numImgs; ++k) {
+        vstrImages[k] = vstrImgTime[k].first;
+        vTimeStamps[k] = vstrImgTime[k].second;
     }
 }

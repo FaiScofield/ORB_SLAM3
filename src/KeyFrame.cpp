@@ -96,7 +96,9 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
 
     mnOriginMapId = pMap->GetId();
 
+#if WITH_ODOMETRY
     mOdom = F.mOdom;
+#endif
 }
 
 void KeyFrame::ComputeBoW()

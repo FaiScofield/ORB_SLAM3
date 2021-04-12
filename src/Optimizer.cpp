@@ -1181,7 +1181,7 @@ int Optimizer::PoseOptimization(Frame *pFrame)
     return nInitialCorrespondences-nBad;
 }
 
-
+#if WITH_ODOMETRY
 int Optimizer::PoseOptimizationOnSE2(Frame *pFrame, const cv::Mat& _Tcb)
 {
     g2o::SparseOptimizer optimizer;
@@ -1540,7 +1540,7 @@ int Optimizer::PoseOptimizationOnSE2(Frame *pFrame, const cv::Mat& _Tcb)
 
     return nInitialCorrespondences - nBad;
 }
-
+#endif
 
 void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, vector<KeyFrame*> &vpNonEnoughOptKFs)
 {

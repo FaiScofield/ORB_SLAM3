@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
     Ptr<ORBextractor> pDetector = makePtr<ORBextractor>(ORBextractor(500, 2.0f, 3, 25, 15));
     Ptr<cv::ORB> pCvORB = cv::ORB::create(500, 2.0f, 3, 25, 15);
     Ptr<DescriptorMatcher> pMatcher = DescriptorMatcher::create("BruteForce-Hamming");
-    Ptr<CLAHE> claher = createCLAHE(2.0, Size(6, 6));
+    Ptr<CLAHE> claher = createCLAHE(2.0, Size(8, 8));
 
     /// data
     size_t nKPs1, nKPs2;

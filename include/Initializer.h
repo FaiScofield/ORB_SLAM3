@@ -20,7 +20,7 @@
 #ifndef INITIALIZER_H
 #define INITIALIZER_H
 
-#include<opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
 #include "Frame.h"
 
 #include <unordered_set>
@@ -100,9 +100,9 @@ private:
     GeometricCamera* mpCamera;
 
 #if WITH_LINES
-    std::vector<KeyLine> mvKeyLines1;
+    std::vector<cv::line_descriptor::KeyLine> mvKeyLines1;
+    std::vector<cv::line_descriptor::KeyLine> mvKeyLines2;
     std::vector<Vector3d> mvKeyLineFunctions1;
-    std::vector<KeyLine> mvKeyLines2;
     std::vector<Vector3d> mvKeyLineFunctions2;
     std::vector<Match> mvLineMatches12;
     std::vector<bool> mvbLineMatched1;

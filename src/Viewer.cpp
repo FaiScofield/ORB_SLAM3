@@ -22,7 +22,7 @@
 
 #include <mutex>
 
-#define HIDE_ORB_SLAM3_TITLE    1
+#define HIDE_ORB_SLAM3_TITLE    0
 
 namespace ORB_SLAM3
 {

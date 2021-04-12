@@ -92,6 +92,7 @@ if __name__=="__main__":
     # draw
     fig = plt.figure()
     ax = fig.add_subplot(111)
+    # plot_traj(ax,sync_stamps,sync_xyz.transpose().A,'-',"black","Trajectory")
     plot_traj(ax,sync_stamps,sync_xyz.transpose().A,'-',"black","odometry_sync")
     plot_traj(ax,orig_stamps,full_xyz.transpose().A,'-',"blue", "odometry_orig")
     ax.legend()

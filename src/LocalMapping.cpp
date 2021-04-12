@@ -1085,9 +1085,9 @@ void LocalMapping::KeyFrameCulling()
                 KeyFrame* pParent = pKF->GetParent();
                 if (pParent) {
                     cv::Mat Tcp = pKF->GetPose() * pParent->GetPoseInverse();
-                    double distance = cv::norm(Tcp.rowRange(0, 3).col(3));
+                    const double distance = cv::norm(Tcp.rowRange(0, 3).col(3));
                     // only cull frame that less then 0.1m
-                    if (distance < 0.1) {
+                    if (distance < 0.05) {
                         pKF->SetBadFlag();
                     }
                 } else {

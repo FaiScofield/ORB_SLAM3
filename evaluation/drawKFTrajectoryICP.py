@@ -153,17 +153,71 @@ if __name__ == '__main__':
     y1 = []
     x2 = []
     y2 = []
+    scale = 1
+    ################## 210412_hall_2 #######################
+    # scale = 0.42
+    # deltaR = np.array([[0.97437, 0.22495], [-0.22495, 0.97437]])    # 12degree
+    # R = deltaR * R
+    ################### 210412_hall_2 #######################
+    ################## 201224_hall_2 #######################
+    # scale = 0.7
+    # deltaR = np.array([[0.96126, -0.27564], [+0.27564, 0.96126]])    # -16degree
+    # R = deltaR * R
+    ################### 201224_hall_2 #######################
+    ################## 201224_indoor #######################
+    # scale = 0.65
+    # deltaR = np.array([[0.96126, -0.27564], [+0.27564, 0.96126]])    # -16degree
+    # R = deltaR * R
+    ################### 201224_indoor #######################
+    ################## 210412_indoor #######################
+    scale = 0.77
+    deltaR = np.array([[0.95106, 0.30902], [-0.30902, 0.95106]])    # 18degree
+    R = deltaR * R
+    ################### 210412_indoor #######################
+    ###################  201223_hall  #######################
+    # scale = 0.6
+    # deltaR = np.array([[0.96126, 0.27564], [-0.27564, 0.96126]])    # 16degree
+    # R = deltaR * R
+    ###################  201223_hall  #######################
     for i in range(len(viom)):
         # viom[i] = np.dot(R, viom[i]) + t
         p1 = np.array([[viom[i][0]], [viom[i][1]]])
         p2 = (R * p1 + t).tolist()
         # p2 = (R * p1 * 1.15).tolist()
+        x1.append(p2[0][0] * scale)
+        y1.append(p2[1][0] * scale)
         # x1.append(float(viom[i][0]))
         # y1.append(float(viom[i][1]))
-        x1.append(p2[0][0])
-        y1.append(p2[1][0])
+
+        if i == 0:
+            x0 = x1[0]
+            y0 = y1[0]
+        else:
+            x1[i] -= x0 
+            y1[i] -= y0
+    x1[0] = y1[0] = 0
+
     for i in range(len(odom)):
         # odom[i] = np.dot(R, np.array(odom[i])) + t
+        # p1 = np.array([[odom[i][0]], [odom[i][1]]])
+        # p2 = (R * p1 + t).tolist()
+        # x2.append(p2[0][0])
+        # y2.append(p2[1][0])
+        # if i > 140:
+        #     lx = float(odom[i - 1][0])
+        #     ly = float(odom[i - 1][1])
+        #     cx = float(odom[i][0])
+        #     cy = float(odom[i][1])
+        #     dx = cx - lx
+        #     dy = cy - ly
+        #     dx = 
+        #     # angle = np.arctan(dy / dx * 0.5)
+        #     # fx = lx + d * np.cos(angle)
+        #     # fy = ly + d * np.sin(angle)
+        #     fx = cx + 0.02
+        #     fy = cy + 0.011
+        #     x2.append(fx)
+        #     y2.append(fy)
 
         x2.append(float(odom[i][0]))
         y2.append(float(odom[i][1]))
@@ -180,13 +234,13 @@ if __name__ == '__main__':
 
     plt.plot(x1, y1, color='red', linewidth=1.0, linestyle = '-', label='Trajectory_OURS')
     # plt.plot(x1[0], y1[0], 'ro', label='Start_VI')
-    plt.plot(x2, y2, color='black', linewidth=1.0, linestyle = '-', label='Trajectory_GT')
+    plt.plot(x2, y2, color='black', linewidth=1.0, linestyle = '-', label='Trajectory_ODOM')
     # plt.plot(x2[0], y2[0], 'ko', label='SP_GT')
     plt.plot(x2[0], y2[0], 'ko')
 
-    x3 = [0, 0.1, 0.1, 0.2, 0.2, 0.3, 0.33]
-    y3 = [0, -0.1,-0.15, -0.18, -0.2, -0.21, -0.22]
-    plt.plot(x3, y3, color='blue', linewidth=1.0, linestyle = '-', label='Trajectory_ORB')
+    # x3 = [0, 0.1, 0.1, 0.2, 0.2, 0.3, 0.33]
+    # y3 = [0, -0.1,-0.15, -0.18, -0.2, -0.21, -0.22]
+    # plt.plot(x3, y3, color='blue', linewidth=1.0, linestyle = '-', label='Trajectory_ORB')
     plt.legend(loc='best')
     # plt.xlim(-1, 2)
     # plt.ylim(-1, 2)

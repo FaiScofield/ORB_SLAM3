@@ -38,15 +38,15 @@
 #include <opencv2/viz.hpp>
 
 #if WITH_LINES
-#include "LINEextractor.h"
+#include "LineExtractor.h"
 #include "LSDmatcher.h"
 using namespace cv::line_descriptor;
 #endif
 using namespace cv;
 using namespace std;
 
-#define ENABLE_DEBUG_TRACKING_DATA_CV_VIZ              1
-#define ENABLE_DEBUG_TRACKING_DATA_CV_SHOW             (1 && !ENABLE_DEBUG_TRACKING_DATA_CV_VIZ)
+#define ENABLE_DEBUG_TRACKING_DATA_CV_VIZ              0
+#define ENABLE_DEBUG_TRACKING_DATA_CV_SHOW             (0 && !ENABLE_DEBUG_TRACKING_DATA_CV_VIZ)
 #define ENABLE_OPTIMAZATION_WITH_PLANAR_CONSTRAINT     0
 
 namespace ORB_SLAM3
@@ -186,6 +186,12 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
 
 Tracking::~Tracking()
 {
+    if (mpImuCalib)
+        delete mpImuCalib;
+    if (mpImuPreintegratedFromLastKF)
+        delete mpImuPreintegratedFromLastKF;
+
+        
     //f_track_stats.close();
 #ifdef SAVE_TIMES
     f_track_times.close();
@@ -1128,16 +1134,24 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp,
     {
         assert(mpIniORBextractor && mpORBVocabulary && mpCamera);
         assert(mpOdomCalib);
+    #if WITH_LINES
         if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
-            mCurrentFrame = Frame(mImGray,cv::Mat(),timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpOdomCalib);
+            mCurrentFrame = Frame(mImGray,cv::Mat(),timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpOdomCalib, mpLSDextractorLeft);
         else
-            mCurrentFrame = Frame(mImGray,cv::Mat(),timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpOdomCalib);
+            mCurrentFrame = Frame(mImGray,cv::Mat(),timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpOdomCalib, mpLSDextractorLeft);
+    #else
+        if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
+            mCurrentFrame = Frame(mImGray,cv::Mat(),timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpOdomCalib, nullptr);
+        else
+            mCurrentFrame = Frame(mImGray,cv::Mat(),timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpOdomCalib, nullptr);
+    #endif
         mCurrentFrame.mOdom = mlQueueOdomData.back();   // TODO @Vance
     }
 #endif
-#if WITH_LINES
+#if 0//WITH_LINES
     // set line extractor
     mCurrentFrame.setLineExtractor(mpLSDextractorLeft);
+    mCurrentFrame.ExtractLSD();
 #endif
 
     if (mState==NO_IMAGES_YET)
@@ -1574,10 +1588,10 @@ void Tracking::Track()
     {
         if(mSensor==System::STEREO || mSensor==System::RGBD || mSensor==System::IMU_STEREO)
             StereoInitialization();
-    #if WITH_ODOMETRY
-        else if (mSensor == System::ODOM_MONOCULAR)
-            MonocularInitializationWithOdometry();
-    #endif
+    // #if WITH_ODOMETRY
+    //     else if (mSensor == System::ODOM_MONOCULAR)
+    //         MonocularInitializationWithOdometry();
+    // #endif
         else
             MonocularInitialization();
 
@@ -2684,6 +2698,7 @@ bool Tracking::TrackLocalMap()
 
     UpdateLocalMap();
     SearchLocalPoints();
+    bool ok = mvpLocalKeyFrames.size() && mvpLocalMapPoints.size();
 
     // TOO check outliers before PO
     int aux1 = 0, aux2=0;
@@ -2696,7 +2711,7 @@ bool Tracking::TrackLocalMap()
         }
 
     int inliers;
-    if (!mpAtlas->isImuInitialized()) {
+    if (!mpAtlas->isImuInitialized() && ok) {
 #if ENABLE_OPTIMAZATION_WITH_PLANAR_CONSTRAINT
         if (mSensor == System::ODOM_MONOCULAR)
             Optimizer::PoseOptimizationOnSE2(&mCurrentFrame, mpOdomCalib->Tcb);
@@ -2704,7 +2719,7 @@ bool Tracking::TrackLocalMap()
 #endif
             Optimizer::PoseOptimization(&mCurrentFrame);
     }
-    else
+    else if (ok)
     {
         if(mCurrentFrame.mnId<=mnLastRelocFrameId+mnFramesToResetIMU)
         {
@@ -2730,6 +2745,10 @@ bool Tracking::TrackLocalMap()
                 inliers = Optimizer::PoseInertialOptimizationLastKeyFrame(&mCurrentFrame); // , !mpLastKeyFrame->GetMap()->GetIniertialBA1());
             }
         }
+    }
+    else    // no enough KFs & MPs
+    {
+        return false;
     }
 
     aux1 = 0, aux2 = 0;
@@ -4442,12 +4461,12 @@ bool Tracking::TriangulateWithOdometry(const std::vector<cv::KeyPoint>& vKeys1, 
 
 bool Tracking::AcceptMPDepth(const Point3f& P3D)
 {
-    return P3D.z > 2.5f && P3D.z < 3.5f;
+    return P3D.z > 2.2f && P3D.z < 3.2f;
 }
 
 bool Tracking::AcceptMPDepth(const Mat& P3D)
 {
-    return P3D.at<float>(2) > 2.5f && P3D.at<float>(2) < 3.5f;
+    return P3D.at<float>(2) > 2.2f && P3D.at<float>(2) < 3.2f;
 }
 
 
@@ -4525,17 +4544,15 @@ void Tracking::UpdateFrameODOM(const float s, KeyFrame* pCurrentKeyFrame)
 
 void Tracking::MonocularInitializationWithOdometry()
 {
-    const int minKPnumForInit = 50;      // org 100
-    const int minKPMatchesForInit = 25;  // org 100
+    const int minKPnumForInit = 100;      // org 100
+    const int minKPMatchesForInit = max(20., minKPnumForInit * 0.3);;  // org 100
 
-    if (mnInitFailedCnt >= 3 && mInitDeltaTrans > 0.20f) {  // 20cm
-        CLOGW("Initialization continously failed more then 3 times && mInitDeltaTrans(%.2f) > 0.2m ! Change initial frame!", mInitDeltaTrans);
+    if (mnInitFailedCnt >= 5 && mInitDeltaTrans > 0.20f) {  // 20cm
+        CLOGW("[TRACK] Initialization continously failed more then 3 times && mInitDeltaTrans(%.2f) > 0.2m ! Change initial frame!", mInitDeltaTrans);
         mnInitFailedCnt = 0;
         mInitDeltaTrans = 0.f;
         delete mpInitializer;
         mpInitializer = static_cast<Initializer*>(NULL);
-        // fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
-        // fill(mvIniLineMatches.begin(), mvIniLineMatches.end(), -1);
     }
 
     if (!mpInitializer)
@@ -4556,44 +4573,43 @@ void Tracking::MonocularInitializationWithOdometry()
             // mvIniLastLineMatches = vector<int>(mCurrentFrame.mvKeys.size(), -1);
             // mbIniFirst = false;
 
-            mInitDeltaTrans = (mCurrentFrame.mOdom - mInitialFrame.mOdom).normSquare();
+            mInitDeltaTrans = 0.f;
 
-            LOGT("Create mpInitializer success!");
+            LOGT("[TRACK] Create mpInitializer success!");
             return;
         } else {
-            LOGW("Keypoints too less: " << mCurrentFrame.mvKeys.size() << " < " << minKPnumForInit);
+            LOGW("[TRACK] Keypoints too less: " << mCurrentFrame.mvKeys.size() << " < " << minKPnumForInit << ", change initial frame!");
         }
     }
     else
     {
         // Try to initialize
-        mInitDeltaTrans = (mCurrentFrame.mOdom - mInitialFrame.mOdom).normSquare();
-
-        if ((int)mCurrentFrame.mvKeys.size() <= minKPnumForInit) {
-            LOGW("Keypoints too less: " << mCurrentFrame.mvKeys.size() << " < " << minKPnumForInit);
-            mnInitFailedCnt++;
+        LOGT("[TRACK] mInitialFrame.mOdom = " << mInitialFrame.mOdom << ", mCurrentFrame.mOdom = " << mCurrentFrame.mOdom);
+        mInitDeltaTrans = sqrt((mCurrentFrame.mOdom - mInitialFrame.mOdom).normSquare());
+        // avoid too close
+        if (mInitDeltaTrans < 0.001) {   // 1ms
+            CLOGI("[TRACK] Too close between %ld and %ld ... mInitDeltaTrans = %.2fms, skip this frame!\n", mInitialFrame.mnId, mCurrentFrame.mnId, mInitDeltaTrans * 1000);
             return;
         }
 
-        CLOGT("Initialize between %ld and %ld ... mInitDeltaTrans = %.2fms\n", mInitialFrame.mnId, mCurrentFrame.mnId, mInitDeltaTrans * 1000);
+        if ((int)mCurrentFrame.mvKeys.size() <= minKPnumForInit * 0.6) {
+            LOGW("[TRACK] Keypoints too less: " << mCurrentFrame.mvKeys.size() << " < " << minKPnumForInit*0.6 << ", change current frame!");
+            mnInitFailedCnt++;
+            return;
+        }
+        CLOGT("[TRACK] Initialize between %ld and %ld ... mInitDeltaTrans = %.2fms\n", mInitialFrame.mnId, mCurrentFrame.mnId, mInitDeltaTrans * 1000);
 
         // Find correspondences
         ORBmatcher matcher(0.9, true);  // org 0.9
         int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 100); // org 100
 
-    #if WITH_LINES
-        int lineMatches = 0;
-        LSDmatcher lmatcher;
-        lineMatches = lmatcher.SearchDouble(mLastFrame, mCurrentFrame, mvIniLineMatches);
-    #endif
-
         // Check if there are enough correspondences
         if (nmatches < minKPMatchesForInit)
         {
-            cerr << "[WARN] Keypoint matches too less: " << nmatches << " < " << minKPMatchesForInit << endl;
-            delete mpInitializer;
-            mpInitializer = static_cast<Initializer*>(NULL);
-            fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
+            LOGW("[TRACK] Keypoint matches too less: " << nmatches << " < " << minKPMatchesForInit << ", change current frame!");
+            // delete mpInitializer;
+            // mpInitializer = static_cast<Initializer*>(NULL);
+            // fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
             // fill(mvIniLineMatches.begin(), mvIniLineMatches.end(), -1);
             // mvIniLastLineMatches = vector<int>(mCurrentFrame.mvKeys.size(), -1);
             mnInitFailedCnt++;
@@ -4633,6 +4649,13 @@ void Tracking::MonocularInitializationWithOdometry()
             KeyPoint::convert(mInitialFrame.mvKeysUn, mvbPrevMatched);
             transform(mvbPrevMatched, mvbPrevMatched, A12);
         }
+
+    #if WITH_LINES
+        int lineMatches = 0;
+        LSDmatcher lmatcher;
+        // lineMatches = lmatcher.SearchDouble(mLastFrame, mCurrentFrame, mvIniLineMatches);
+        lineMatches = lmatcher.SearchDouble(mInitialFrame, mCurrentFrame, mvIniLineMatches);
+    #endif
 
 #if ENABLE_DEBUG_TRACKING_DATA_CV_SHOW
         // show KP matches
@@ -4718,17 +4741,15 @@ void Tracking::MonocularInitializationWithOdometry()
         cv::Mat tcw;                       // tc2c1
         vector<bool> vbTriangulated;       // Triangulated Correspondences (mvIniMatches)
 
-#if 1
+#if 0
         const Mat Tb2b1 = (ODOM::invOdom(mCurrentFrame.mOdom) + mInitialFrame.mOdom).toCvSE3();
         const Mat Tc2c1 = mpOdomCalib->Tcb * Tb2b1 * mpOdomCalib->Tbc;
         Rcw = Tc2c1.rowRange(0, 3).colRange(0, 3);
         tcw = Tc2c1.rowRange(0, 3).col(3);
         bool ok = TriangulateWithOdometry(mInitialFrame.mvKeysUn, mCurrentFrame.mvKeysUn, mvIniMatches, Rcw, tcw,
                                           mvIniP3D, vbTriangulated);
-        bool ok2 = false;
     #if WITH_LINES
-        if (mbWithLines)
-            ok2 = TriangulateLines(mvIniLineMatches, mK, Rcw, tcw, mvLineS3D, mvLineE3D, mvbLineTriangulated);
+        bool ok2 = TriangulateLines(mvIniLineMatches, mK, Rcw, tcw, mvLineS3D, mvLineE3D, mvbLineTriangulated);
     #endif
 #else
         bool ok = mpCamera->ReconstructWithTwoViews(mInitialFrame.mvKeysUn, mCurrentFrame.mvKeysUn, mvIniMatches, Rcw,
@@ -4795,14 +4816,14 @@ bool Tracking::TrackWithOdometry()
     Mat Tb2b1 = dodom_o2o1.toCvSE3();
     Mat Tc2c1 = Tcb * Tb2b1 * Tbc;
     LOGT("mLastFrame.mOdom = " << mLastFrame.mOdom << ", mCurrentFrame.mOdom = " << mCurrentFrame.mOdom);
-    LOGT("Tb2b1 = " << dodom_o2o1);
-    LOGT("Tc2c1 = " << endl << Tc2c1);
-    if (!mVelocity.empty())
-        LOGT("mVelocity = " << endl << mVelocity);
+    // LOGT("Tb2b1 = " << dodom_o2o1);
+    // LOGT("Tc2c1 = " << endl << Tc2c1);
+    // if (!mVelocity.empty())
+    //     LOGT("mVelocity = " << endl << mVelocity);
 
     // Tc2c1 * Tc1w
     mCurrentFrame.SetPose(Tc2c1 * mLastFrame.mTcw);
-    LOGT("mCurrentFrame pose update to: " << endl << mCurrentFrame.mTcw);
+    // LOGT("mCurrentFrame pose update to: " << endl << mCurrentFrame.mTcw);
 
     fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), static_cast<MapPoint*>(NULL));
 
@@ -4886,7 +4907,7 @@ bool Tracking::TrackWithOdometry()
 
 #if WITH_LINES
 
-bool Tracking::TriangulateLines(const vector<cv::KeyPoint>& vKL1, const vector<cv::KeyPoint>& vKL2,
+bool Tracking::TriangulateLines(const vector<KeyLine>& vKL1, const vector<KeyLine>& vKL2,
                                 const vector<int>& vMatches12, cv::Mat& R21, cv::Mat& t21, vector<cv::Point3f>& vP3dS,
                                 vector<cv::Point3f>& vP3dE, vector<bool>& vbTriangulated)
 {

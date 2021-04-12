@@ -196,8 +196,10 @@ int main(int argc, char* argv[])
 
         // frame construction
         Mat noDistort = cv::Mat::zeros(4, 1, CV_32FC1);
+        // frameCur = Frame(gray, mask, vTimeStamps[k], pDetector.get(), pVocabulary.get(),
+        //                     pCamera.get(), noDistort, 0.f, 0.f);
         frameCur = Frame(gray, mask, vTimeStamps[k], pDetector.get(), pVocabulary.get(),
-                            pCamera.get(), noDistort, 0.f, 0.f);
+                            pCamera.get(), noDistort, 0.f, 0.f, nullptr, ODOM::Calib());
         frameCur.mImgLeft = gray.clone();
 
         int nMatches, nInliers;

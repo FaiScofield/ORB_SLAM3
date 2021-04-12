@@ -32,6 +32,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/line_descriptor.hpp>
 #include <vector>
+using cv::line_descriptor::KeyLine;
 
 namespace ORB_SLAM3
 {
@@ -61,12 +62,12 @@ public:
     Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth, GeometricCamera* pCamera,Frame* pPrevF = static_cast<Frame*>(NULL), const IMU::Calib &ImuCalib = IMU::Calib());
 
     // Constructor for Monocular cameras. (with mask)
-    Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, GeometricCamera* pCamera, cv::Mat &distCoef, const float &bf, const float &thDepth, Frame* pPrevF = static_cast<Frame*>(NULL), const IMU::Calib &ImuCalib = IMU::Calib());
+    Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, GeometricCamera* pCamera, cv::Mat &distCoef, const float &bf, const float &thDepth, Frame* pPrevF = static_cast<Frame*>(NULL), const IMU::Calib &ImuCalib = IMU::Calib(), LINEextractor* pLineExtractor = nullptr);
 
 #if WITH_ODOMETRY
     // Constructor for Monocular-Odometry
     Frame(const cv::Mat &imGray, const cv::Mat &mask, double timeStamp, ORBextractor *extractor, ORBVocabulary *voc, GeometricCamera *pCamera, cv::Mat &distCoef, const float &bf, const float &thDepth, Frame *pPrevF,
-          const ODOM::Calib &odomCalib);
+          const ODOM::Calib &odomCalib, LINEextractor* pLineExtractor = nullptr);
 
     cv::Mat GetOdomPosition();
     cv::Mat GetOdomRotation();
@@ -83,6 +84,7 @@ public:
     // extract line feature
     void setLineExtractor(LINEextractor* pExtractor) { mpLSDextractorLeft = pExtractor; }
 
+    void ExtractLSD();
     void ExtractLSD(const cv::Mat &im, const cv::Mat &mask);
 
     void ComputeLine3D(Frame &frame1, Frame &frame2);

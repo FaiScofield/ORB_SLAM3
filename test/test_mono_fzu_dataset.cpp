@@ -7,7 +7,7 @@
 #include <opencv2/core/core.hpp>
 #include <boost/filesystem.hpp>
 
-#define ENABLE_EQUALIZE_HISTOGRAM   0
+#define ENABLE_EQUALIZE_HISTOGRAM   1
 
 using namespace std;
 namespace bf = boost::filesystem;
@@ -21,6 +21,7 @@ int main(int argc, char** argv)
     string sequenceFolder;
     string odomRawFile;
 
+    int startIdx = 0;
     if (argc < 3) {
         cout << "use default parameters..." << endl;
         settingFile = "/home/vance/dataset/fzu/ORB-SLAM3-Config.yaml";
@@ -32,10 +33,15 @@ int main(int argc, char** argv)
         if (argc >= 4) {
             odomRawFile = string(argv[3]);
         }
+        if (argc >= 5) {
+            startIdx = atoi(argv[4]);
+            startIdx = max(0, startIdx);
+        }
     }
     cout << "sequence: " << sequenceFolder << endl;
     cout << "settingFile: " << settingFile << endl;
     cout << "odomRawFile: " << odomRawFile << endl;
+    cout << "startIdx: " << startIdx << endl;
 
     // Retrieve paths to images
     vector<string> vstrImageFilenames;
@@ -97,7 +103,7 @@ int main(int argc, char** argv)
 
     // Main loop
     cv::Mat im, imCa;
-    for (int ni = 0; ni < nImages; ni++) {
+    for (int ni = startIdx; ni < nImages; ni++) {
         cout << "========================= " << ni << " / " << nImages << " =========================" << endl;
 
         // Read image from file
@@ -110,8 +116,13 @@ int main(int argc, char** argv)
         }
 
 #if ENABLE_EQUALIZE_HISTOGRAM
+        // char fileName[128];
+        // snprintf(fileName, 128, "/home/vance/output/img_%d_source.png", ni);
+        // imwrite(fileName, im);
         pClaher->apply(im, imCa);
         im = imCa;
+        // snprintf(fileName, 128, "/home/vance/output/img_%d_clahed.png", ni);
+        // imwrite(fileName, im);
 #endif
 
 #ifdef COMPILEDWITHC11

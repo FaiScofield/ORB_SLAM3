@@ -315,7 +315,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 }
 
 // Constructor for Monocular cameras.
-Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, GeometricCamera* pCamera, cv::Mat &distCoef, const float &bf, const float &thDepth, Frame* pPrevF, const IMU::Calib &ImuCalib)
+Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, GeometricCamera* pCamera, cv::Mat &distCoef, const float &bf, const float &thDepth, Frame* pPrevF, const IMU::Calib &ImuCalib, LINEextractor* pLineExtractor)
     :mpcpi(NULL),mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
      mTimeStamp(timeStamp), mK(static_cast<Pinhole*>(pCamera)->toK()), mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),
      mImuCalib(ImuCalib), mpImuPreintegrated(NULL),mpPrevFrame(pPrevF),mpImuPreintegratedFrame(NULL), mpReferenceKF(static_cast<KeyFrame*>(NULL)), mbImuPreintegrated(false), mpCamera(pCamera),
@@ -339,13 +339,15 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
 #endif
 
 #if WITH_LINES
+    mpLSDextractorLeft = pLineExtractor;
+    assert(mpLSDextractorLeft);
+
     // undistort image
     cv::Mat mUndistX, mUndistY;
     initUndistortRectifyMap(mK, mDistCoef, cv::Mat_<double>::eye(3, 3), mK, cv::Size(imGray.cols, imGray.rows), CV_32F, mUndistX, mUndistY);
     cv::remap(imGray, mImgLeftUn, mUndistX, mUndistY, cv::INTER_LINEAR);
 
     // Scale Level Info for line
-    assert(mpLSDextractorLeft);
     mnScaleLevelsLine = mpLSDextractorLeft->GetLevels();
     mfScaleFactorLine = mpLSDextractorLeft->GetScaleFactor();
     mfLogScaleFactorLine = log(mfScaleFactor);
@@ -558,14 +560,14 @@ Frame::Frame(const cv::Mat& imGray, const cv::Mat& mask, const double& timeStamp
 // Constructor for Monocular-Odometry
 Frame::Frame(const cv::Mat& imGray, const cv::Mat& mask, double timeStamp, ORBextractor* extractor, 
              ORBVocabulary* voc, GeometricCamera* pCamera, cv::Mat& distCoef, const float& bf, const float& thDepth, 
-             Frame* pPrevF, const ODOM::Calib& odomCalib):
+             Frame* pPrevF, const ODOM::Calib& odomCalib, LINEextractor* pLineExtractor):
     mpcpi(NULL),
     mpORBvocabulary(voc), mpORBextractorLeft(extractor), mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
     mTimeStamp(timeStamp), mK(static_cast<Pinhole*>(pCamera)->toK()), mDistCoef(distCoef.clone()), mbf(bf),
     mThDepth(thDepth), mImuCalib(IMU::Calib()), mpImuPreintegrated(NULL), mpPrevFrame(pPrevF),
     mpImuPreintegratedFrame(NULL), mpReferenceKF(static_cast<KeyFrame*>(NULL)), mbImuPreintegrated(false),
     mpCamera(pCamera), mpCamera2(nullptr), mTimeStereoMatch(0), mTimeORB_Ext(0),
-    mOdomCalib(odomCalib)/* , mpOdomPreintegrated(NULL), mpOdomPreintegratedFrame(NULL) */
+    mOdomCalib(odomCalib)
 {
     // Frame ID
     mnId = nNextId++;
@@ -588,13 +590,15 @@ Frame::Frame(const cv::Mat& imGray, const cv::Mat& mask, double timeStamp, ORBex
 #endif
 
 #if WITH_LINES
+    mpLSDextractorLeft = pLineExtractor;
+    assert(mpLSDextractorLeft);
+
     // undistort image
     cv::Mat mUndistX, mUndistY;
     initUndistortRectifyMap(mK, mDistCoef, cv::Mat_<double>::eye(3, 3), mK, cv::Size(imGray.cols, imGray.rows), CV_32F, mUndistX, mUndistY);
     cv::remap(imGray, mImgLeftUn, mUndistX, mUndistY, cv::INTER_LINEAR);
 
     // Scale Level Info for line
-    assert(mpLSDextractorLeft);
     mnScaleLevelsLine = mpLSDextractorLeft->GetLevels();
     mfScaleFactorLine = mpLSDextractorLeft->GetScaleFactor();
     mfLogScaleFactorLine = log(mfScaleFactor);
@@ -609,7 +613,7 @@ Frame::Frame(const cv::Mat& imGray, const cv::Mat& mask, double timeStamp, ORBex
     threadLine.join();
     
     N = mvKeys.size();
-    NL = mvKeylinesUn.size();  //特征线的数量
+    NL = mvKeylinesUn.size();
     if (mvKeys.empty())
         return;
     mvKeysUn = mvKeys;
@@ -1681,7 +1685,7 @@ void Frame::AssignFeaturesToGridForLine()
     //#pragma omp parallel for
     for(int i=0;i<NL;i++)
     {
-        const cv::KeyLine &kl = mvKeylinesUn[i];
+        const KeyLine &kl = mvKeylinesUn[i];
 
         list<pair<int, int>> line_coords;
 
@@ -1696,9 +1700,35 @@ void Frame::AssignFeaturesToGridForLine()
     }
 }
 
+void Frame::ExtractLSD()
+{
+    if (mImgLeftUn.empty()) {
+        cv::Mat mUndistX, mUndistY, mImGray_remap;
+        initUndistortRectifyMap(mK, mDistCoef, cv::Mat_<double>::eye(3,3), mK, cv::Size(mImgLeft.cols, mImgLeft.rows), CV_32F, mUndistX, mUndistY);
+        cv::remap(mImgLeft, mImgLeftUn, mUndistX, mUndistY, cv::INTER_LINEAR);
+    }
+    ExtractLSD(mImgLeftUn, cv::Mat());
+}
+
 void Frame::ExtractLSD(const cv::Mat &im, const cv::Mat &mask)
 {
-    (*mpLSDextractorLeft)(im, mask, mvKeylinesUn, mLdesc, mvKeyLineFunctions);
+    if (mpLSDextractorLeft)
+    {
+        // Scale Level Info for line
+        mnScaleLevelsLine = mpLSDextractorLeft->GetLevels();
+        mfScaleFactorLine = mpLSDextractorLeft->GetScaleFactor();
+        mfLogScaleFactorLine = log(mfScaleFactor);
+        mvScaleFactorsLine = mpLSDextractorLeft->GetScaleFactors();
+        mvInvScaleFactorsLine = mpLSDextractorLeft->GetInverseScaleFactors();
+        mvLevelSigma2Line = mpLSDextractorLeft->GetScaleSigmaSquares();
+        mvInvLevelSigma2Line = mpLSDextractorLeft->GetInverseScaleSigmaSquares();
+
+        (*mpLSDextractorLeft)(im, mask, mvKeylinesUn, mLdesc, mvKeyLineFunctions);
+
+        NL = mvKeylinesUn.size();
+        mvpMapLines = vector<MapLine*>(NL, static_cast<MapLine*>(NULL));
+        mvbLineOutlier = vector<bool>(NL, false);
+    }
 }
 
 
