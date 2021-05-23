@@ -30,3 +30,8 @@ target_link_libraries(match_odometry ${Boost_LIBRARIES} ${EIGEN3_LIBS})
 
 add_executable(test_eigen test_eigen.cpp)
 target_link_libraries(test_eigen ${EIGEN3_LIBS})
+
+
+add_executable(stitch_video stitch_video.cpp)
+target_link_libraries(stitch_video ${OpenCV_LIBS})
+

@@ -4765,7 +4765,7 @@ void Tracking::MonocularInitializationWithOdometry()
                 }
             }
 
-        #if WITH_LINES
+        #if WITH_LINES && 0
             if (ok2) {
                 for (size_t i = 0, iend = mvIniLineMatches.size(); i < iend; i++) {
                     if (mvIniLineMatches[i] >= 0 && !mvbLineTriangulated[i]) {
