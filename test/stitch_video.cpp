@@ -13,7 +13,7 @@ int main(int argc, char const *argv[])
 {
 	const string file1("/home/vance/Pictures/good_result_0412/2021-04-12-ORMSLAM3-badResult-做对比用-hall2.mp4");
 	const string file2("/home/vance/Pictures/good_result_0412/2021-04-12-PL-SLAM-Very-Good-Result.mp4");
-	const string file3("/home/vance/Videos/ORBSLAM3_VS_OURS.avi");
+	const string file3("/home/vance/Videos/ORBSLAM3_VS_OURS_long.avi");
 
 	VideoCapture video1(file1);
 	VideoCapture video2(file2);
@@ -42,10 +42,14 @@ int main(int argc, char const *argv[])
 		video1.read(frame1);
 		video2.read(frame2);
 
-		if (frame1.empty() || frame2.empty())
+		if (frame1.empty() || frame2.empty()) {
+			cout << "video 1 or video 2 reach to end!" << endl;
 			break;
+		}
+		frameCnt1++;
+		frameCnt2++;
 
-		if (frameCnt1++ % step != 0)
+		if (frameCnt1 % step != 0)
 			continue;
 
 		// putText(frame1, to_string(frameCnt1), Point(100, 100), FONT_HERSHEY_COMPLEX_SMALL, 1., Scalar(0,0,255));
@@ -60,7 +64,7 @@ int main(int argc, char const *argv[])
 	video1.release();
 	video2.release();
 	video3.release();
-	
+	cout << "done." << endl;
 	return 0;
 }
 

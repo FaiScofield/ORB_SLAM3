@@ -12,7 +12,7 @@ endif()
 ## Options
 SET(HAVE_G2O FALSE)     # use g2o with self built
 option(WITH_LINES    "option for LINES feature"  OFF)
-option(WITH_ODOMETRY "option for ODOMETRY input" ON)
+option(WITH_ODOMETRY "option for ODOMETRY input" OFF)
 if (WITH_LINES)
     add_definitions(-DWITH_LINES=1)
     message(STATUS "Using flag: WITH_LINES")

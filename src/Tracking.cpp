@@ -1512,6 +1512,7 @@ void Tracking::Track()
             CreateMapInAtlas();
             return;
         }
+    #if 0
         else if(mCurrentFrame.mTimeStamp>mLastFrame.mTimeStamp+1.0)
         {
             CLOGW("Diff of timestamp > 1s !!! Last frame(%ld) timestamp: %.2f, Current frame(%ld) timestamp: %.2f\n",
@@ -1542,6 +1543,7 @@ void Tracking::Track()
             return;
         #endif
         }
+    #endif
     }
 
 

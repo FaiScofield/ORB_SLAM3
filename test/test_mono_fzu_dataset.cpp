@@ -7,7 +7,7 @@
 #include <opencv2/core/core.hpp>
 #include <boost/filesystem.hpp>
 
-#define ENABLE_EQUALIZE_HISTOGRAM   1
+#define ENABLE_EQUALIZE_HISTOGRAM   0
 
 using namespace std;
 namespace bf = boost::filesystem;
@@ -132,13 +132,16 @@ int main(int argc, char** argv)
 #endif
 
         // Pass the image to the SLAM system
+#if WITH_ODOMETRY
         if (bWithOdom) {
             vector<ORB_SLAM3::ODOM::Point> vOdomsThisFrame;
             vOdomsThisFrame.push_back(vOdometries[ni]);
             SLAM.TrackMonocularWithOdom(im, tframe, vOdomsThisFrame);
-        } else {
-            SLAM.TrackMonocular(im, tframe);
         }
+        else
+#endif
+            SLAM.TrackMonocular(im, tframe);
+
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
